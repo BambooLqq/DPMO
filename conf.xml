@@ -1,0 +1,15 @@
+<address>
+	<client>
+		<node>
+			<id>1</id>
+			<ip>192.168.3.102</ip>
+		</node>
+		<node>
+			<id>2</id>
+			<ip>192.168.3.101</ip>
+		</node>
+	</client>
+    <server>
+        <ip>1.2.3.4</ip>
+    </server>
+</address>
