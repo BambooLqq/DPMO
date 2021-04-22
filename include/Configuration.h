@@ -10,14 +10,14 @@
 
 class Configuration {
  private:
-  boost::property_tree::ptree pt;
-  std::unordered_map<uint16_t, std::string> id2ip;  // for client
-  std::unordered_map<std::string, uint16_t> ip2id;  // for client
+  boost::property_tree::ptree pt_;
+  std::unordered_map<uint16_t, std::string> id2ip_;  // for client
+  std::unordered_map<std::string, uint16_t> ip2id_;  // for client
 
-  std::string server_ip;
-  uint16_t server_nodeid;  // default = 0
-  int server_count;        // default = 1 server's nodeid = 0;
-  int client_count;        //
+  std::string server_ip_;
+  uint16_t server_nodeid_;  // default = 0
+  int server_count_;        // default = 1 server's nodeid = 0;
+  int client_count_;        //
 
  public:
   Configuration();
@@ -30,6 +30,9 @@ class Configuration {
   int getClientCount();
   int getServerCount();
   int getServerNodeID();
+  bool addClient(uint16_t nodeid, std::string client_ip);
+  bool deleteClientByID(uint16_t nodeid);
+  bool deleteClientByIP(std::string client_ip);
   std::string getServerIP();
 };
 #endif  // !_CONFIGURATION_H_
