@@ -59,5 +59,7 @@ class Queue {
     queue.push_back(item);
     __sync_fetch_and_add(&offset, 1);
   }
+
+  uint8_t size() { return __sync_fetch_and_add(&offset, 0); }
 };
 #endif  // !_GLOBAL_H
