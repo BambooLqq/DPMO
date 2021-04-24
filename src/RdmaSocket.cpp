@@ -1,6 +1,10 @@
 #include "RdmaSocket.h"
 
 PeerConnection ::~PeerConnection() {
+  if (cq) {
+    ibv_destroy_cq(cq);
+    cq = NULL;
+  }
   for (int i = 0; i < QP_NUMBER; i++) {
     if (qp[i] != NULL) {
       ibv_destroy_qp(qp[i]);
@@ -9,12 +13,11 @@ PeerConnection ::~PeerConnection() {
   }
 }
 
-RdmaSocket::RdmaSocket(int cq_num, uint64_t buf_addr, uint64_t buf_size,
+RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
                        Configuration *conf, bool is_server, uint8_t mode,
                        uint32_t sock_port, std::string device_name,
                        uint32_t rdma_port)
-    : cq_num_(cq_num),
-      device_name_(device_name),
+    : device_name_(device_name),
       buf_size_(buf_size),
       buf_addr_(buf_addr),
       conf_(conf),
@@ -25,17 +28,12 @@ RdmaSocket::RdmaSocket(int cq_num, uint64_t buf_addr, uint64_t buf_size,
       rdma_port_(rdma_port),
       sock_port_(sock_port),
       gid_index_(0),
-      cq_ptr_(0),
       max_node_id_(0),
       ctx_(NULL),
       pd_(NULL),
       mr_(NULL),
       my_ip_("") {
   // create completion queue
-  cq.resize(cq_num_);
-  for (int i = 0; i < cq_num_; i++) {
-    cq[i] = NULL;
-  }
   server_count_ = conf_->getServerCount();
   client_count_ = conf->getClientCount();  // server的nodeid 默认为0
   max_node_id_ = client_count_ + 1;  //当有新的client加入时 为他分配的id
@@ -143,15 +141,6 @@ bool RdmaSocket::CreateSource() {
   }
 
   Debug::notifyInfo("Create Completion Queue");
-  /* Create CQ for a certain number. */
-  for (i = 0; i < cq_num_; i++) {
-    cq[i] = ibv_create_cq(ctx_, QPS_MAX_DEPTH, NULL, NULL, 0);
-    if (cq[i] == NULL) {
-      Debug::notifyError("failed to create CQ");
-      rc = 1;
-      goto create_source_exit;
-    }
-  }
 
   /* allocate Protection Domain */
   Debug::notifyInfo("Allocate Protection Domain");
@@ -180,12 +169,6 @@ create_source_exit:
     Debug::notifyError("Error Encountered, Cleanup ...");
 
     // clean cq
-    for (i = 0; i < cq_num_; i++) {
-      if (cq[i] != NULL) {
-        ibv_destroy_cq(cq[i]);
-        cq[i] = NULL;
-      }
-    }
 
     if (pd_ != NULL) {
       ibv_dealloc_pd(pd_);
@@ -243,16 +226,6 @@ bool RdmaSocket::DestroySource() {
   peers.clear();
 
   // destroy cq
-  for (int i = 0; i < cq.size(); i++) {
-    if (cq[i] != NULL) {
-      if (ibv_destroy_cq(cq[i])) {
-        Debug::notifyError("Failed to destroy CQ");
-        rc = 1;
-      }
-      cq[i] == NULL;
-    }
-  }
-  cq.clear();
 
   if (mr_) {
     if (ibv_dereg_mr(mr_)) {
@@ -631,14 +604,14 @@ bool RdmaSocket::CreateQueuePair(PeerConnection *peer) {
     attr.qp_type = IBV_QPT_UC;
   }
   attr.sq_sig_all = 0;
-
-  attr.send_cq = cq[cq_ptr_];
-  attr.recv_cq = cq[cq_ptr_];
-  peer->cq = cq[cq_ptr_];
-
-  if (cq_ptr_ >= cq_num_) {
-    cq_ptr_ = 0;
+  peer->cq = ibv_create_cq(ctx_, QPS_MAX_DEPTH, NULL, NULL, 0);
+  if (peer->cq) {
+    Debug::notifyError("failed to create CQ");
+    return false;
   }
+
+  attr.send_cq = peer->cq;
+  attr.recv_cq = peer->cq;
 
   attr.cap.max_send_wr = QPS_MAX_DEPTH;
   attr.cap.max_recv_wr = QPS_MAX_DEPTH;
@@ -707,53 +680,6 @@ void RdmaSocket::RdmaQueryQueuePair(uint16_t node_id) {
                           node_id, i);
         break;
     }
-  }
-}
-
-// Data Transfering
-
-// 轮询cq 查看是否完成
-
-int RdmaSocket::PollWithCQ(int cq_index, int poll_number, struct ibv_wc *wc) {
-  int count = 0;
-
-  do {
-    count += ibv_poll_cq(cq[cq_index], 1, wc);
-  } while (count < poll_number);
-
-  if (count < 0) {
-    Debug::notifyError("Poll Completion failed.");
-    return -1;
-  }
-
-  /* Check Completion Status */
-  if (wc->status != IBV_WC_SUCCESS) {
-    Debug::notifyError("Failed status %s (%d) for wr_id %d",
-                       ibv_wc_status_str(wc->status), wc->status,
-                       (int)wc->wr_id);
-    return -1;
-  }
-  Debug::debugItem("Find New Completion Message");
-  return count;
-}
-
-int RdmaSocket::PollOnce(int cq_index, int poll_number, struct ibv_wc *wc) {
-  int count = ibv_poll_cq(cq[cq_index], poll_number, wc);
-  if (count == 0) {
-    return 0;
-  } else if (count == -1) {
-    Debug::notifyError(
-        "Failure occurred when reading work completions, ret = %d", count);
-    return -1;
-  }
-
-  if (wc->status != IBV_WC_SUCCESS) {
-    Debug::notifyError("Failed status %s (%d) for wr_id %d",
-                       ibv_wc_status_str(wc->status), wc->status,
-                       (int)wc->wr_id);
-    return -1;
-  } else {
-    return count;
   }
 }
 
@@ -829,6 +755,16 @@ bool RdmaSocket::RdmaSend(uint16_t node_id, uint64_t source_buffer,
     return false;
   }
   return true;
+}
+
+bool RdmaSocket::RemoteSend(uint16_t node_id, uint64_t source_buffer,
+                            uint64_t buffer_size) {
+  if (RdmaSend(node_id, source_buffer, buffer_size)) {
+    struct ibv_wc wc;
+    PollCompletion(node_id, 1, &wc);
+    return true;
+  }
+  return false;
 }
 
 bool RdmaSocket::RdmaRecv(uint16_t node_id, uint64_t source_buffer,

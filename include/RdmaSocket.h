@@ -151,9 +151,6 @@ class RdmaSocket {
   ibv_context *ctx_;
   ibv_mr *mr_;
   ibv_pd *pd_;
-  std::vector<ibv_cq *> cq;
-  int cq_num_;
-  int cq_ptr_;
   uint64_t buf_addr_;  // buf地址
   uint64_t buf_size_;  // buf size
 
@@ -217,10 +214,9 @@ class RdmaSocket {
     socl_port 使用sock进行同步的时候 使用的端口信息
     device_name 希望使用的rdma网卡设备名 如果为空字符串将找一个可以用的
    */
-  RdmaSocket(int cq_num, uint64_t buf_addr, uint64_t buf_size,
-             Configuration *conf, bool is_server, uint8_t mode,
-             uint32_t sock_port, std::string device_name = "",
-             uint32_t rdma_port = 5678);
+  RdmaSocket(uint64_t buf_addr, uint64_t buf_size, Configuration *conf,
+             bool is_server, uint8_t mode, uint32_t sock_port,
+             std::string device_name = "", uint32_t rdma_port = 5678);
   ~RdmaSocket();
 
   // 等待连接
@@ -236,19 +232,8 @@ class RdmaSocket {
   int PollCompletion(uint16_t node_id, int poll_number, struct ibv_wc *wc);
 
   PeerConnection *GetPeerConnection(uint16_t nodeid);
-  int GetCqNum() { return cq_num_; }
   uint16_t GetNodeId() { return my_node_id_; }
   void RdmaQueryQueuePair(uint16_t node_id);
-
-  // 取出cq中的第poll_number元素
-  // 正常返回count = poll_number
-  // 失败返回-1
-  // wc 存取了第poll_number个wc
-  int PollWithCQ(int cq_index, int poll_number, struct ibv_wc *wc);
-
-  // 取出cq中前poll_number个wc
-  // wc为 completion queue 元素数组
-  int PollOnce(int cq_index, int poll_number, struct ibv_wc *wc);
 
   // 拉取第poll_number个wc，
   int PollCompletion(uint16_t node_id, int poll_number, struct ibv_wc *wc);
@@ -261,6 +246,9 @@ class RdmaSocket {
   // buffer_size sending data size
   // source_buffer 为地址
   bool RdmaSend(uint16_t node_id, uint64_t source_buffer, uint64_t buffer_size);
+
+  bool RemoteSend(uint16_t node_id, uint64_t source_buffer,
+                  uint64_t buffer_size);
 
   // nodeid 发送到nodeid
   // source buffer keep receving data
