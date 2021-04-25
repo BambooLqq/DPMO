@@ -10,6 +10,8 @@
 #include <mutex>
 #include <vector>
 
+#define MAX_CLIENT_NUM 4
+
 // used for client or server's worker thread
 // 队列实现 保证多线程的原子性和并发性
 

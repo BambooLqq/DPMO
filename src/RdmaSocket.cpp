@@ -521,6 +521,8 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection *peer) {
     my_node_id_ = remote_id.given_id;
     peer->node_id = remote_id.node_id;
     is_new_client_ = false;
+    client_count_++;
+    conf_->addClient(my_node_id_, my_ip_);
   } else if (is_new_client_ == false) {
     peer->node_id = remote_id.node_id;
   }

@@ -36,8 +36,9 @@
 #define SENDSIZE 1024 * 1024
 #define ONEMB 1024 * 1024
 #define FOURMB 1024 * 1024 * 4
-#define PAGESIZE 4 * 1024
-#define FOURKB 4 * 1024
+#define FOURKB 4 * 1024  // 4KB
+
+#define PAGESIZE sysconf(_SC_PAGESIZE)
 
 class PeerConnection {
  public:
@@ -155,6 +156,7 @@ class RdmaSocket {
   uint64_t buf_size_;  // buf size
 
   Configuration *conf_;
+
   uint16_t my_node_id_;
   uint16_t max_node_id_;
 
