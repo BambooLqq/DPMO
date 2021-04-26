@@ -17,9 +17,9 @@
 #include <thread>
 #include <unordered_map>
 
-#include "Configuration.h"
-#include "Debug.h"
-#include "Global.h"
+#include "Configuration.hpp"
+#include "Debug.hpp"
+#include "Global.hpp"
 
 #define MAX_POST_LIST 24
 #define QPS_MAX_DEPTH 128
@@ -103,7 +103,7 @@ typedef enum
 typedef struct TransferTask
 {
     ReqType op_type;
-    uint16_t node_id;
+    PeerConnection* peer;
     uint64_t size;
     union
     {
@@ -152,7 +152,7 @@ class RdmaSocket
 private:
     // first is nodeid
     // second is peerConnection data
-    std::unordered_map<uint16_t, PeerConnection*> peers;
+    // std::unordered_map<uint16_t, PeerConnection*> peers;
 
     std::string device_name_;
     uint32_t sock_port_;
@@ -163,16 +163,15 @@ private:
     ibv_context* ctx_;
     ibv_mr* mr_;
     ibv_pd* pd_;
-    uint64_t buf_addr_; // buf地址
-    uint64_t buf_size_; // buf size
+    uint32_t buf_addr_; // buf地址
+    uint32_t buf_size_; // buf size
 
     Configuration* conf_;
 
     uint16_t my_node_id_;
     uint16_t max_node_id_;
 
-    std::thread listener_; // wait for client / server connection
-    uint8_t mode_;         // RC - 0 , UC - 1, UD - 2 // 可能都是RC
+    uint8_t mode_; // RC - 0 , UC - 1, UD - 2 // 可能都是RC
 
     bool is_running_;
     bool is_server_;
@@ -194,7 +193,6 @@ private:
     bool DestroySource();
 
     bool CreateQueuePair(PeerConnection* peer);
-    bool ConnectQueuePair(PeerConnection* peer);
 
     bool ModifyQPtoInit(struct ibv_qp* qp);
     bool ModifyQPtoRTR(struct ibv_qp* qp, uint32_t remote_qpn, uint16_t dlid,
@@ -202,20 +200,10 @@ private:
     bool ModifyQPtoRTS(struct ibv_qp* qp);
 
     // sock连接nodeID号机器
-    int SocketConnect(uint16_t NodeID);
+
     int SockSyncData(int sock, int size, char* local_data, char* remote_data);
 
-    void RdmaAccept(int fd);
     bool DataTransferWorker(int id);
-
-    bool IsConnected(uint16_t node_id)
-    {
-        if (peers.find(node_id) == peers.end())
-        {
-            return false;
-        }
-        return true;
-    }
 
     void AddClient(uint16_t node_id, std::string ip)
     {
@@ -231,71 +219,66 @@ public:
     device_name 希望使用的rdma网卡设备名 如果为空字符串将找一个可以用的
    */
     RdmaSocket(uint64_t buf_addr, uint64_t buf_size, Configuration* conf,
-               bool is_server, uint8_t mode, uint32_t sock_port,
-               std::string device_name = "", uint32_t rdma_port = 5678);
+               bool is_server, uint8_t mode, uint32_t sock_port = 0,
+               std::string device_name = "", uint32_t rdma_port = 1);
     ~RdmaSocket();
 
+    int SocketConnect(uint16_t NodeID);
+
     // 等待连接
-    void RdmaListen();
-
-    // 连接服务器
-    bool RdmaConnectServer();
-
-    // 连接其他客户机
-    bool RdmaConnectClient(uint16_t node_id);
+    int RdmaListen();
 
     //
+    bool ConnectQueuePair(PeerConnection* peer);
     int PollCompletion(uint16_t node_id, int poll_number, struct ibv_wc* wc);
 
-    PeerConnection* GetPeerConnection(uint16_t nodeid);
     uint16_t GetNodeId()
     {
         return my_node_id_;
     }
-    void RdmaQueryQueuePair(uint16_t node_id);
 
     // 拉取第poll_number个wc，
-    int PollCompletion(uint16_t node_id, int poll_number, struct ibv_wc* wc);
+    int PollCompletion(struct ibv_cq* cq, int poll_number, struct ibv_wc* wc);
 
     // 拉取poll_Number个wc 放在wc数组中
-    int PollCompletionOnce(uint16_t node_id, int poll_number, struct ibv_wc* wc);
+    int PollCompletionOnce(struct ibv_cq* cq, int poll_number, struct ibv_wc* wc);
 
     // nodeid 发送到nodeid
     // source buffer keep sending data
     // buffer_size sending data size
     // source_buffer 为地址
-    bool RdmaSend(uint16_t node_id, uint64_t source_buffer, uint64_t buffer_size);
-
-    bool RemoteSend(uint16_t node_id, uint64_t source_buffer,
-                    uint64_t buffer_size);
+    bool RdmaSend(struct ibv_qp* qp, uint64_t source_buffer, uint64_t buffer_size);
 
     // nodeid 发送到nodeid
     // source buffer keep receving data
     // buffer_size recving data size
     // source_buffer 为地址
-    bool RdmaRecv(uint16_t node_id, uint64_t source_buffer, uint64_t buffer_size);
+    bool RdmaRecv(struct ibv_qp* qp, uint64_t source_buffer, uint64_t buffer_size);
 
     // source buffer为发送数据的绝对地址
     // des_buffer 为要写入的相对地址
     // imm -1 为 RDMA_WRITE
+    // read write 用于Client间读取数据
 
-    bool RdmaWrite(uint16_t node_id, uint64_t buffer_send, uint64_t recv_offset,
+    bool RdmaWrite(PeerConnection* peer, uint64_t buffer_send, uint64_t recv_offset,
                    uint64_t size, uint32_t imm, int worker_id);
 
-    bool OutboundHamal(uint16_t node_id, uint64_t buffer_send,
+    bool OutboundHamal(PeerConnection* peer, uint64_t buffer_send,
                        uint64_t recv_offset, uint64_t size, int worker_id);
-    bool RemoteWrite(uint16_t node_id, uint64_t buffer_send, uint64_t recv_offset,
+    bool RemoteWrite(PeerConnection* peer, uint64_t buffer_send, uint64_t recv_offset,
                      uint64_t size);
 
     // buffer_recv 为接收数据的绝对地址
     // des_buffer 为读取数据的相对地址
     // size读取数据的大小
-    bool RdmaRead(uint16_t node_id, uint64_t buffer_recv, uint64_t des_offset,
+    bool RdmaRead(PeerConnection* peer, uint64_t buffer_recv, uint64_t des_offset,
                   uint64_t size, int worker_id);
-    bool InboundHamal(uint16_t node_id, uint64_t buffer_recv, uint64_t des_offset,
+    bool InboundHamal(PeerConnection* peer, uint64_t buffer_recv, uint64_t des_offset,
                       uint64_t size, int worker_id);
-    bool RemoteRead(uint16_t node_id, uint64_t buffer_recv, uint64_t des_offset,
+    bool RemoteRead(PeerConnection* peer, uint64_t buffer_recv, uint64_t des_offset,
                     uint64_t size);
+
+    void RdmaQueryQueuePair(struct ibv_qp* qp);
 };
 
 #endif // !_RDMA_SOCKET_H

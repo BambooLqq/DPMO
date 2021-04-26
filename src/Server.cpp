@@ -1,10 +1,11 @@
-#include "Server.h"
+#include "Server.hpp"
 
-Server::Server(int sock_port = 0, std::string config_file_path = "")
+Server::Server(int sock_port, std::string config_file_path,
+               std::string device_name, uint32_t rdma_port)
 {
     conf_ = new Configuration(config_file_path);
     addr_ = 0;
-    buf_size_ = FOURMB * (MAX_CLIENT_NUM);
+    buf_size_ = FOURMB * (MAX_CLIENT_NUM)*2;
     int ret = posix_memalign((void**)&addr_, PAGESIZE, buf_size_);
 
     if (ret == 0 || (uintptr_t)addr_ == NULL)
@@ -15,9 +16,11 @@ Server::Server(int sock_port = 0, std::string config_file_path = "")
     {
         Debug::notifyInfo("Client Alloc Memory size %d successd", buf_size_);
     }
-    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, true, 0, sock_port); // RC
+    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, true, 0,
+                                 sock_port, device_name, rdma_port); // RC
+    is_running_ = true;
 
-    rdmasocket_->RdmaListen();
+    Listen();
 }
 
 Server::~Server()
@@ -46,6 +49,12 @@ Server::~Server()
         }
         pool_info_.clear();
     }
+    for (auto itr = peers.begin(); itr != peers.end(); itr++)
+    {
+        delete itr->second;
+        itr->second = NULL;
+    }
+    peers.clear();
     Debug::notifyInfo("RPCServer is closed successfully.");
 }
 
@@ -84,4 +93,64 @@ bool Server::DeletePool(uint32_t pool_id)
     }
     Debug::notifyError("Don't exist the pool %d", pool_id);
     return false;
+}
+
+void Server::Accecpt(int sock)
+{
+    struct sockaddr_in remote_address;
+    int fd;
+    // struct timespec start, end;
+    socklen_t sin_size = sizeof(struct sockaddr_in);
+    while (is_running_ && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size)) != -1)
+    {
+        Debug::notifyInfo("Accept a client");
+        PeerConnection* peer = new PeerConnection();
+        peer->sock = fd;
+        if (rdmasocket_->ConnectQueuePair(peer) == false)
+        {
+            Debug::notifyError("RDMA connect with error");
+            delete peer;
+        }
+        else
+        {
+            peer->counter = 0;
+            peers[peer->node_id] = peer;
+            my_node_id_ = rdmasocket_->GetNodeId();
+            Debug::notifyInfo("Client %d Connect Server %d", peer->node_id,
+                              my_node_id_);
+            /* Rdma Receive in Advance. */
+            // 接收recv请求
+            for (int i = 0; i < QPS_MAX_DEPTH; i++)
+            {
+                rdmasocket_->RdmaRecv(peer->qp[0], GetClientRecvBaseAddr(peer->node_id), FOURMB);
+            }
+            std::thread* poll_cq_ = new std::thread(&ProcessRequest, this, peer->node_id);
+            poll_request[peer->node_id] = poll_cq_;
+            Debug::debugItem("Accepted to Node%d", peer->node_id);
+        }
+    }
+}
+
+void Server::Listen()
+{
+    int listen_sock = rdmasocket_->RdmaListen();
+    Accecpt(listen_sock);
+}
+
+PeerConnection* Server::GetPeerConnection(uint16_t nodeid)
+{
+    std::unordered_map<uint16_t, PeerConnection*>::iterator itr;
+    if ((itr = peers.find(nodeid)) != peers.end())
+    {
+        return itr->second;
+    }
+    else
+    {
+        Debug::notifyInfo("Not Connected with nodeid %d", nodeid);
+        return NULL;
+    }
+}
+
+void Server::ProcessRequest(uint16_t nodeid)
+{
 }

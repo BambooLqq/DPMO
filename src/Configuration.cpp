@@ -1,6 +1,6 @@
-#include "Configuration.h"
+#include "Configuration.hpp"
 
-#include "Debug.h"
+#include "Debug.hpp"
 
 Configuration::Configuration()
 {
@@ -70,6 +70,15 @@ Configuration::Configuration(std::string config_file_path)
     server_count_ = 0;
     client_count_ = 0;
     server_nodeid_ = 0;
+    if (config_file_path.size() == 0)
+    {
+        std::string path = "../conf.xml";
+        char resolved_path[1024];
+        memset(resolved_path, 0, 1024);
+        realpath(path.c_str(), resolved_path);
+        std::cout << resolved_path << std::endl;
+        config_file_path = resolved_path;
+    }
     boost::property_tree::xml_parser::read_xml(config_file_path, pt_);
 
     boost::property_tree::ptree child = pt_.get_child("address");

@@ -1,4 +1,4 @@
-#include "RdmaSocket.h"
+#include "RdmaSocket.hpp"
 
 PeerConnection ::~PeerConnection()
 {
@@ -22,8 +22,8 @@ RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
                        uint32_t sock_port, std::string device_name,
                        uint32_t rdma_port)
     : device_name_(device_name),
-      buf_size_(buf_size),
       buf_addr_(buf_addr),
+      buf_size_(buf_size),
       conf_(conf),
       mode_(mode),
       is_new_client_(false),
@@ -75,9 +75,12 @@ RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
     }
     CreateSource();
 
-    for (int i = 0; i < WORKER_NUMBER; i++)
+    if (!is_server_) // client
     {
-        worker_[i] = std::thread(&RdmaSocket::DataTransferWorker, this, i);
+        for (int i = 0; i < WORKER_NUMBER; i++)
+        {
+            worker_[i] = std::thread(&RdmaSocket::DataTransferWorker, this, i);
+        }
     }
 }
 
@@ -85,10 +88,12 @@ RdmaSocket::~RdmaSocket()
 {
     Debug::notifyInfo("Stop RdmaSocket.");
     is_running_ = false;
-    listener_.detach();
-    for (int i = 0; i < WORKER_NUMBER; i++)
+    if (!is_server_)
     {
-        worker_[i].detach();
+        for (int i = 0; !is_server_ && i < WORKER_NUMBER; i++)
+        {
+            worker_[i].detach();
+        }
     }
     DestroySource();
     Debug::notifyInfo("RdmaSocket is closed successfully.");
@@ -180,6 +185,7 @@ bool RdmaSocket::CreateSource()
 
     /* register the memory buffer */
     Debug::notifyInfo("Register Memory Region");
+    std::cout << "buf_size = " << buf_size_ << " buf_addr_ = " << std::hex << buf_addr_ << std::endl;
 
     mr_ = ibv_reg_mr(pd_, (void*)buf_addr_, buf_size_, mr_flags);
     if (mr_ == NULL)
@@ -252,16 +258,6 @@ bool RdmaSocket::ModifyQPtoInit(ibv_qp* qp)
 bool RdmaSocket::DestroySource()
 {
     bool rc = true;
-
-    // destroy qp
-    for (auto itr = peers.begin(); itr != peers.end(); itr++)
-    {
-        delete itr->second;
-        itr->second = NULL;
-    }
-    peers.clear();
-
-    // destroy cq
 
     if (mr_)
     {
@@ -419,7 +415,7 @@ int RdmaSocket::SockSyncData(int sock, int size, char* local_data,
     return rc;
 }
 
-void RdmaSocket::RdmaListen()
+int RdmaSocket::RdmaListen()
 {
     struct sockaddr_in my_address;
     int sock;
@@ -446,113 +442,7 @@ void RdmaSocket::RdmaListen()
     }
 
     listen(sock, 5);
-
-    listener_ = std::thread(&RdmaSocket::RdmaAccept, this, sock);
-}
-
-void RdmaSocket::RdmaAccept(int sock)
-{
-    struct sockaddr_in remote_address;
-    int fd;
-    // struct timespec start, end;
-    socklen_t sin_size = sizeof(struct sockaddr_in);
-    while (is_running_ && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size)) != -1)
-    {
-        Debug::notifyInfo("Accept a client");
-        PeerConnection* peer = new PeerConnection();
-        peer->sock = fd;
-        if (ConnectQueuePair(peer) == false)
-        {
-            Debug::notifyError("RDMA connect with error");
-            delete peer;
-        }
-        else
-        {
-            peer->counter = 0;
-            peers[peer->node_id] = peer;
-            Debug::notifyInfo("Client %d Connect Client %d", peer->node_id,
-                              my_node_id_);
-            /* Rdma Receive in Advance. */
-            // 接收recv请求
-            for (int i = 0; i < QPS_MAX_DEPTH; i++)
-            {
-                RdmaRecv(peer->node_id, buf_addr_ + peer->node_id * 4096, 4096);
-            }
-
-            Debug::debugItem("Accepted to Node%d", peer->node_id);
-        }
-    }
-}
-
-//
-bool RdmaSocket::RdmaConnectServer()
-{
-    int sock;
-    /* Connect to Node 0 firstly to get clientID. */
-
-    if (peers.find(0) != peers.end())
-    {
-        Debug::notifyInfo("RdmaConnectServer: Have Connected With Server");
-        return true;
-    }
-    sock = SocketConnect(0);
-    if (sock < 0)
-    {
-        Debug::notifyError("Socket connection failed to server 0");
-        return false;
-    }
-    PeerConnection* peer = new PeerConnection();
-    peer->sock = sock;
-    /* Add server's NodeID to the structure */
-    peer->node_id = 0;
-    if (ConnectQueuePair(peer) == false)
-    {
-        Debug::notifyError("RDMA connect with error");
-        delete peer;
-        return false;
-    }
-    else
-    {
-        peers[peer->node_id] = peer;
-        peer->counter = 0;
-        Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
-        return true;
-    }
-}
-
-bool RdmaSocket::RdmaConnectClient(uint16_t node_id)
-{
-    int sock;
-    /* Connect to Node 0 firstly to get clientID. */
-
-    if (peers.find(node_id) != peers.end())
-    {
-        Debug::notifyInfo("RdmaConnectServer: Have Connected With Server");
-        return true;
-    }
-    sock = SocketConnect(node_id);
-    if (sock < 0)
-    {
-        Debug::notifyError("Socket connection failed to server 1");
-        return false;
-    }
-    PeerConnection* peer = new PeerConnection();
-    peer->sock = sock;
-    /* Add server's NodeID to the structure */
-    peer->node_id = node_id;
-    if (ConnectQueuePair(peer) == false)
-    {
-        Debug::notifyError("RDMA connect with error");
-        delete peer;
-        return false;
-    }
-    else
-    {
-        peers[peer->node_id] = peer;
-        peer->counter = 0;
-        Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
-        return true;
-    }
+    return sock;
 }
 
 bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
@@ -640,7 +530,7 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
 
     // 交换控制信息
     local_metadata.rkey = mr_->rkey;
-    for (int i = 0; i < QP_NUMBER; i++)
+    for (int i = 0; i < is_server_ ? 1 : QP_NUMBER; i++)
     {
         local_metadata.qp_num[i] = peer->qp[i]->qp_num;
     }
@@ -660,7 +550,7 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
     peer->lid = remote_metata.lid;
     peer->buf_addr = remote_metata.buf_addr;
     memcpy(peer->gid, remote_metata.gid, 16);
-    for (int i = 0; i < QP_NUMBER; i++)
+    for (int i = 0; i < is_server_ ? 1 : QP_NUMBER; i++)
     {
         peer->qp_num[i] = remote_metata.qp_num[i];
     }
@@ -735,7 +625,7 @@ bool RdmaSocket::CreateQueuePair(PeerConnection* peer)
     attr.cap.max_recv_sge = 1;
     attr.cap.max_inline_data = 0;
 
-    for (int i = 0; i < QP_NUMBER; i++)
+    for (int i = 0; i < is_server_ ? 1 : QP_NUMBER; i++)
     {
         peer->qp[i] = ibv_create_qp(pd_, &attr);
         Debug::notifyInfo("Create Queue Pair with Num = %d", peer->qp[i]->qp_num);
@@ -745,75 +635,22 @@ bool RdmaSocket::CreateQueuePair(PeerConnection* peer)
             return false;
         }
     }
+
     return true;
 }
 
-PeerConnection* RdmaSocket::GetPeerConnection(uint16_t nodeid)
-{
-    std::unordered_map<uint16_t, PeerConnection*>::iterator itr;
-    if ((itr = peers.find(nodeid)) != peers.end())
-    {
-        return itr->second;
-    }
-    else
-    {
-        Debug::notifyInfo("Not Connected with nodeid %d", nodeid);
-        return NULL;
-    }
-}
-
-void RdmaSocket::RdmaQueryQueuePair(uint16_t node_id)
-{
-    struct ibv_qp_attr attr;
-    struct ibv_qp_init_attr init_attr;
-    if (IsConnected(node_id) == false) return;
-    for (int i = 0; i < QP_NUMBER; i++)
-    {
-        ibv_query_qp(peers[node_id]->qp[0], &attr, IBV_QP_STATE, &init_attr);
-        switch (attr.qp_state)
-        {
-        case IBV_QPS_RESET:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_RESET\n",
-                              node_id, i);
-            break;
-        case IBV_QPS_INIT:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_INIT\n", node_id,
-                              i);
-            break;
-        case IBV_QPS_RTR:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_RTR\n", node_id,
-                              i);
-            break;
-        case IBV_QPS_RTS:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_RTS\n", node_id,
-                              i);
-            break;
-        case IBV_QPS_SQD:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_SQD\n", node_id,
-                              i);
-            break;
-        case IBV_QPS_SQE:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_SQE\n", node_id,
-                              i);
-            break;
-        case IBV_QPS_ERR:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_ERR\n", node_id,
-                              i);
-            break;
-        case IBV_QPS_UNKNOWN:
-            Debug::notifyInfo("Client %d with QP %d state: IBV_QPS_UNKNOWN\n",
-                              node_id, i);
-            break;
-        }
-    }
-}
-
-int RdmaSocket::PollCompletion(uint16_t node_id, int poll_number,
+int RdmaSocket::PollCompletion(struct ibv_cq* cq, int poll_number,
                                struct ibv_wc* wc)
 {
+    if (cq == NULL)
+    {
+        Debug::notifyError("PollCompletion: cq = NULL");
+        return -1;
+    }
+
     int count = 0;
     do {
-        count += ibv_poll_cq(peers[node_id]->cq, 1, wc);
+        count += ibv_poll_cq(cq, 1, wc);
     } while (count < poll_number);
 
     if (count < 0)
@@ -834,10 +671,15 @@ int RdmaSocket::PollCompletion(uint16_t node_id, int poll_number,
     return count;
 }
 
-int RdmaSocket::PollCompletionOnce(uint16_t node_id, int poll_number,
+int RdmaSocket::PollCompletionOnce(struct ibv_cq* cq, int poll_number,
                                    struct ibv_wc* wc)
 {
-    int count = ibv_poll_cq(peers[node_id]->cq, poll_number, wc);
+    if (cq == NULL)
+    {
+        Debug::notifyError("PollCompletionOnce: cq = NULL");
+        return -1;
+    }
+    int count = ibv_poll_cq(cq, poll_number, wc);
     if (count == 0)
     {
         return 0;
@@ -862,12 +704,12 @@ int RdmaSocket::PollCompletionOnce(uint16_t node_id, int poll_number,
     }
 }
 
-bool RdmaSocket::RdmaSend(uint16_t node_id, uint64_t source_buffer,
+bool RdmaSocket::RdmaSend(struct ibv_qp* qp, uint64_t source_buffer,
                           uint64_t buffer_size)
 {
-    if (!IsConnected(node_id))
+    if (qp == NULL)
     {
-        Debug::notifyError("RdmaSend nodeid %d has not connected", node_id);
+        Debug::notifyError("RdmaSend: QP = NULL");
         return false;
     }
     struct ibv_sge sg;
@@ -887,7 +729,7 @@ bool RdmaSocket::RdmaSend(uint16_t node_id, uint64_t source_buffer,
     wr.opcode = IBV_WR_SEND_WITH_IMM;
     wr.send_flags = IBV_SEND_SIGNALED;
 
-    if (ibv_post_send(peers[node_id]->qp[0], &wr, &wrBad))
+    if (ibv_post_send(qp, &wr, &wrBad))
     {
         Debug::notifyError("Send with RDMA_SEND failed.");
         return false;
@@ -895,24 +737,12 @@ bool RdmaSocket::RdmaSend(uint16_t node_id, uint64_t source_buffer,
     return true;
 }
 
-bool RdmaSocket::RemoteSend(uint16_t node_id, uint64_t source_buffer,
-                            uint64_t buffer_size)
-{
-    if (RdmaSend(node_id, source_buffer, buffer_size))
-    {
-        struct ibv_wc wc;
-        PollCompletion(node_id, 1, &wc);
-        return true;
-    }
-    return false;
-}
-
-bool RdmaSocket::RdmaRecv(uint16_t node_id, uint64_t source_buffer,
+bool RdmaSocket::RdmaRecv(struct ibv_qp* qp, uint64_t source_buffer,
                           uint64_t buffer_size)
 {
-    if (!IsConnected(node_id))
+    if (qp == NULL)
     {
-        Debug::notifyError("RdmaSend nodeid %d has not connected", node_id);
+        Debug::notifyError("RdmaRecv: QP = NULL");
         return false;
     }
     struct ibv_sge sg;
@@ -928,7 +758,7 @@ bool RdmaSocket::RdmaRecv(uint16_t node_id, uint64_t source_buffer,
     wr.wr_id = 0;
     wr.sg_list = &sg;
     wr.num_sge = 1;
-    ret = ibv_post_recv(peers[node_id]->qp[0], &wr, &wrBad);
+    ret = ibv_post_recv(qp, &wr, &wrBad);
     if (ret)
     {
         Debug::notifyError("Receive with RDMA_RECV failed, ret = %d.", ret);
@@ -937,19 +767,18 @@ bool RdmaSocket::RdmaRecv(uint16_t node_id, uint64_t source_buffer,
     return true;
 }
 
-bool RdmaSocket::RdmaWrite(uint16_t node_id, uint64_t source_buffer,
+bool RdmaSocket::RdmaWrite(PeerConnection* peer, uint64_t source_buffer,
                            uint64_t des_buffer, uint64_t buffer_size,
                            uint32_t imm, int worker_id)
 {
-    if (!IsConnected(node_id))
+    if (peer == NULL)
     {
-        Debug::notifyError("RdmaSend nodeid %d has not connected", node_id);
+        Debug::notifyError("RDMAWrite peer is null");
         return false;
     }
     struct ibv_sge sg;
     struct ibv_send_wr wr;
     struct ibv_send_wr* wrBad;
-    PeerConnection* peer = peers[node_id];
     memset(&sg, 0, sizeof(sg));
     sg.addr = (uintptr_t)source_buffer;
     sg.length = buffer_size;
@@ -982,10 +811,15 @@ bool RdmaSocket::RdmaWrite(uint16_t node_id, uint64_t source_buffer,
     return true;
 }
 
-bool RdmaSocket::OutboundHamal(uint16_t node_id, uint64_t buffer_send,
+bool RdmaSocket::OutboundHamal(PeerConnection* peer, uint64_t buffer_send,
                                uint64_t recv_offset, uint64_t size,
                                int worker_id)
 {
+    if (peer == NULL)
+    {
+        Debug::notifyError("OutboundHamal peer is null");
+        return false;
+    }
     uint64_t send_packet_size = ONEMB;
     uint64_t sendaddr = buf_addr_ + FOURKB + worker_id * ONEMB;
     uint64_t total_size = 0;
@@ -998,9 +832,9 @@ bool RdmaSocket::OutboundHamal(uint16_t node_id, uint64_t buffer_send,
                                                             : ((size - total_size));
 
         memcpy((void*)sendaddr, (void*)(buffer_send + total_size), send_size);
-        RdmaWrite(node_id, sendaddr, recv_offset + total_size, send_size, -1,
+        RdmaWrite(peer, sendaddr, recv_offset + total_size, send_size, -1,
                   worker_id);
-        PollCompletion(node_id, 1, &wc);
+        PollCompletion(peer->cq, 1, &wc);
         Debug::notifyInfo("Source Addr = %lx, Des Addr = %lx, Size = %d", sendaddr,
                           recv_offset + total_size, send_size);
         total_size += send_size;
@@ -1008,14 +842,19 @@ bool RdmaSocket::OutboundHamal(uint16_t node_id, uint64_t buffer_send,
     __sync_fetch_and_add(&transfer_count, 1);
 }
 
-bool RdmaSocket::RemoteWrite(uint16_t node_id, uint64_t buffer_send,
+bool RdmaSocket::RemoteWrite(PeerConnection* peer, uint64_t buffer_send,
                              uint64_t recv_offset, uint64_t size)
 {
+    if (peer == NULL)
+    {
+        Debug::notifyError("RemoteWrite peer is null");
+        return false;
+    }
     uint64_t ship_size = 0;
 
     if (size < FOURMB)
     {
-        OutboundHamal(node_id, buffer_send, recv_offset, size, 0);
+        OutboundHamal(peer, buffer_send, recv_offset, size, 0);
         return true;
     }
     else
@@ -1030,12 +869,12 @@ bool RdmaSocket::RemoteWrite(uint16_t node_id, uint64_t buffer_send,
             task->recv.recv_offset = recv_offset + i * ship_size;
             task->send.buffer_send_addr = buffer_send + i * ship_size;
             task->size = ship_size;
-            task->node_id = node_id;
+            task->peer = peer;
             queue_[i].PushPolling(task);
         }
 
         // 0号qp发送剩下的数据
-        OutboundHamal(node_id, buffer_send + WORKER_NUMBER * ship_size,
+        OutboundHamal(peer, buffer_send + WORKER_NUMBER * ship_size,
                       recv_offset + WORKER_NUMBER * ship_size,
                       size - (WORKER_NUMBER * ship_size), 0);
         while (transfer_count != WORKER_NUMBER)
@@ -1044,12 +883,12 @@ bool RdmaSocket::RemoteWrite(uint16_t node_id, uint64_t buffer_send,
     }
 }
 
-bool RdmaSocket::RdmaRead(uint16_t node_id, uint64_t buffer_recv,
+bool RdmaSocket::RdmaRead(PeerConnection* peer, uint64_t buffer_recv,
                           uint64_t des_offset, uint64_t size, int worker_id)
 {
-    if (!IsConnected(node_id))
+    if (peer == NULL)
     {
-        Debug::notifyError("RdmaSend nodeid %d has not connected", node_id);
+        Debug::notifyError("RdmaRead peer is null");
         return false;
     }
     struct ibv_sge sg;
@@ -1067,10 +906,10 @@ bool RdmaSocket::RdmaRead(uint16_t node_id, uint64_t buffer_recv,
     wr.num_sge = 1;
     wr.opcode = IBV_WR_RDMA_READ;
     wr.send_flags = IBV_SEND_SIGNALED;
-    wr.wr.rdma.remote_addr = des_offset + peers[node_id]->buf_addr;
-    wr.wr.rdma.rkey = peers[node_id]->rkey;
+    wr.wr.rdma.remote_addr = des_offset + peer->buf_addr;
+    wr.wr.rdma.rkey = peer->rkey;
 
-    if (ibv_post_send(peers[node_id]->qp[worker_id], &wr, &wrBad))
+    if (ibv_post_send(peer->qp[worker_id], &wr, &wrBad))
     {
         Debug::notifyError("Send with RDMA_READ failed.");
         return false;
@@ -1078,10 +917,15 @@ bool RdmaSocket::RdmaRead(uint16_t node_id, uint64_t buffer_recv,
     return true;
 }
 
-bool RdmaSocket::InboundHamal(uint16_t node_id, uint64_t buffer_recv,
+bool RdmaSocket::InboundHamal(PeerConnection* peer, uint64_t buffer_recv,
                               uint64_t des_offset, uint64_t size,
                               int worker_id)
 {
+    if (peer == NULL)
+    {
+        Debug::notifyError("InboundHamal peer is null");
+        return false;
+    }
     uint64_t read_packet_size = ONEMB;
     uint64_t read_addr = buf_addr_ + FOURKB + worker_id * ONEMB;
     uint64_t total_read_size = 0, read_size;
@@ -1093,9 +937,9 @@ bool RdmaSocket::InboundHamal(uint16_t node_id, uint64_t buffer_recv,
                         ? read_packet_size
                         : (size - total_read_size);
 
-        RdmaRead(node_id, read_addr, des_offset + total_read_size, read_size,
+        RdmaRead(peer, read_addr, des_offset + total_read_size, read_size,
                  worker_id);
-        PollCompletion(node_id, 1, &wc);
+        PollCompletion(peer->cq, 1, &wc);
         memcpy((void*)(buffer_recv + total_read_size), (void*)read_addr,
                read_size);
         total_read_size += read_size;
@@ -1104,13 +948,18 @@ bool RdmaSocket::InboundHamal(uint16_t node_id, uint64_t buffer_recv,
     return true;
 }
 
-bool RdmaSocket::RemoteRead(uint16_t node_id, uint64_t buffer_recv,
+bool RdmaSocket::RemoteRead(PeerConnection* peer, uint64_t buffer_recv,
                             uint64_t des_offset, uint64_t size)
 {
+    if (peer == NULL)
+    {
+        Debug::notifyError("RemoteRead peer is null");
+        return false;
+    }
     int ship_size;
     if (size < FOURMB)
     {
-        InboundHamal(node_id, buffer_recv, des_offset, size, 0);
+        InboundHamal(peer, buffer_recv, des_offset, size, 0);
         return true;
     }
     else
@@ -1121,14 +970,14 @@ bool RdmaSocket::RemoteRead(uint16_t node_id, uint64_t buffer_recv,
         for (int i = 0; i < WORKER_NUMBER; i++)
         {
             TransferTask* task = new TransferTask();
-            task->node_id = node_id;
+            task->peer = peer;
             task->op_type = READ;
             task->size = ship_size;
-            task->send.buffer_recv = buffer_recv;
-            task->recv.des_offset = des_offset;
+            task->send.buffer_recv = buffer_recv + i * ship_size;
+            task->recv.des_offset = des_offset + i * ship_size;
             queue_[i].PushPolling(task);
         }
-        InboundHamal(node_id, buffer_recv + WORKER_NUMBER * ship_size,
+        InboundHamal(peer, buffer_recv + WORKER_NUMBER * ship_size,
                      des_offset + WORKER_NUMBER * ship_size,
                      size - WORKER_NUMBER * ship_size, 0);
 
@@ -1148,14 +997,52 @@ bool RdmaSocket::DataTransferWorker(int worker_id)
         task = queue_[worker_id].PopPolling();
         if (task->op_type == WRITE)
         {
-            OutboundHamal(task->node_id, task->send.buffer_send_addr,
+            OutboundHamal(task->peer, task->send.buffer_send_addr,
                           task->recv.recv_offset, task->size, worker_id + 1);
         }
         else if (task->op_type == READ)
         {
-            InboundHamal(task->node_id, task->send.buffer_recv, task->recv.des_offset,
+            InboundHamal(task->peer, task->send.buffer_recv, task->recv.des_offset,
                          task->size, worker_id + 1);
         }
         delete task;
+    }
+}
+void RdmaSocket::RdmaQueryQueuePair(struct ibv_qp* qp)
+{
+    struct ibv_qp_attr attr;
+    struct ibv_qp_init_attr init_attr;
+    if (qp == NULL)
+    {
+        Debug::notifyError("RdmaQueryQueuePair: qp = NULL");
+        return;
+    }
+    ibv_query_qp(qp, &attr, IBV_QP_STATE, &init_attr);
+    switch (attr.qp_state)
+    {
+    case IBV_QPS_RESET:
+        Debug::notifyInfo("QP state: IBV_QPS_RESET\n");
+        break;
+    case IBV_QPS_INIT:
+        Debug::notifyInfo("QP state: IBV_QPS_INIT\n");
+        break;
+    case IBV_QPS_RTR:
+        Debug::notifyInfo("QP state: IBV_QPS_RTR\n");
+        break;
+    case IBV_QPS_RTS:
+        Debug::notifyInfo("QP state: IBV_QPS_RTS\n");
+        break;
+    case IBV_QPS_SQD:
+        Debug::notifyInfo("QP state: IBV_QPS_SQD\n");
+        break;
+    case IBV_QPS_SQE:
+        Debug::notifyInfo("QP state: IBV_QPS_SQE\n");
+        break;
+    case IBV_QPS_ERR:
+        Debug::notifyInfo("QP state: IBV_QPS_ERR\n");
+        break;
+    case IBV_QPS_UNKNOWN:
+        Debug::notifyInfo("QP state: state: IBV_QPS_UNKNOWN\n");
+        break;
     }
 }

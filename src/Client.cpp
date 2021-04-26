@@ -1,23 +1,27 @@
-#include "Client.h"
+#include "Client.hpp"
+#include "malloc.h"
 
-Client::Client(int sock_port, std::string config_file_path)
+Client::Client(int sock_port, std::string config_file_path,
+               std::string device_name, uint32_t rdma_port)
 {
     conf_ = new Configuration(config_file_path);
     addr_ = 0;
-    buf_size_ = FOURMB * (MAX_CLIENT_NUM);
-    int ret = posix_memalign((void**)&addr_, PAGESIZE, buf_size_);
+    buf_size_ = 4096;
+    int ret = 0;
 
-    if (ret == 0 || (uintptr_t)addr_ == NULL)
+    addr_ = reinterpret_cast<uint64_t>(memalign(PAGESIZE, buf_size_));
+
+    if (ret != 0 || addr_ == 0)
     {
         Debug::notifyError("Client Alloc Memory size %d failed", buf_size_);
     }
     else
     {
-        Debug::notifyInfo("Client Alloc Memory size %d successd", buf_size_);
+        Debug::notifyInfo("Client Alloc Memory size %d at addr: %llx successd", buf_size_, addr_);
     }
-    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, false, 0, sock_port); // RC
+    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, false, 0, sock_port, device_name, rdma_port); // RC
 
-    if (rdmasocket_->RdmaConnectServer())
+    if (ConnectServer())
     {
         my_node_id = rdmasocket_->GetNodeId();
         Debug::notifyInfo("Client Connects server successfully, node id = %d",
@@ -28,7 +32,7 @@ Client::Client(int sock_port, std::string config_file_path)
         Debug::notifyError("Client connects server failed");
     }
 
-    rdmasocket_->RdmaListen(); //等待其他机器连接
+    // rdmasocket_->RdmaListen(); //等待其他机器连接
 }
 
 Client::~Client()
@@ -65,5 +69,86 @@ uint64_t Client::GetClientBaseAddr(uint16_t node_id)
     {
         Debug::notifyError("node %d > max_node_num", node_id);
         return 0;
+    }
+}
+
+bool Client::ConnectServer()
+{
+    if (IsConnected(0))
+    {
+        Debug::notifyInfo("RdmaConnectServer: Have Connected With Server");
+        return true;
+    }
+    int sock = rdmasocket_->SocketConnect(0);
+    if (sock < 0)
+    {
+        Debug::notifyError("Socket connection failed to server 0");
+        return false;
+    }
+    PeerConnection* peer = new PeerConnection();
+    peer->sock = sock;
+    /* Add server's NodeID to the structure */
+    peer->node_id = 0;
+    if (rdmasocket_->ConnectQueuePair(peer) == false)
+    {
+        Debug::notifyError("RDMA connect with error");
+        delete peer;
+        return false;
+    }
+    else
+    {
+        peers[peer->node_id] = peer;
+        peer->counter = 0;
+        Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
+        return true;
+    }
+}
+
+bool Client::ConnectClient(uint16_t node_id)
+{
+    int sock;
+    /* Connect to Node 0 firstly to get clientID. */
+
+    if (peers.find(node_id) != peers.end())
+    {
+        Debug::notifyInfo("RdmaConnectServer: Have Connected With Server");
+        return true;
+    }
+    sock = rdmasocket_->SocketConnect(node_id);
+    if (sock < 0)
+    {
+        Debug::notifyError("Socket connection failed to server 1");
+        return false;
+    }
+    PeerConnection* peer = new PeerConnection();
+    peer->sock = sock;
+    /* Add server's NodeID to the structure */
+    peer->node_id = node_id;
+    if (rdmasocket_->ConnectQueuePair(peer) == false)
+    {
+        Debug::notifyError("RDMA connect with error");
+        delete peer;
+        return false;
+    }
+    else
+    {
+        peers[peer->node_id] = peer;
+        peer->counter = 0;
+        Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
+        return true;
+    }
+}
+
+PeerConnection* Client::GetPeerConnection(uint16_t nodeid)
+{
+    std::unordered_map<uint16_t, PeerConnection*>::iterator itr;
+    if ((itr = peers.find(nodeid)) != peers.end())
+    {
+        return itr->second;
+    }
+    else
+    {
+        Debug::notifyInfo("Not Connected with nodeid %d", nodeid);
+        return NULL;
     }
 }

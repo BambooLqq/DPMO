@@ -1,4 +1,4 @@
-#include "Configuration.h"
+#include "Configuration.hpp"
 
 int main() {
   Configuration* conf = new Configuration("/home/user/zyp/dpmo/conf.xml");
