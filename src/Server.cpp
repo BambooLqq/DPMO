@@ -8,13 +8,13 @@ Server::Server(int sock_port, std::string config_file_path,
     buf_size_ = FOURMB * (MAX_CLIENT_NUM)*2;
     int ret = posix_memalign((void**)&addr_, PAGESIZE, buf_size_);
 
-    if (ret == 0 || (void*)addr_ == NULL)
+    if (ret != 0 || (void*)addr_ == NULL)
     {
-        Debug::notifyError("Client Alloc Memory size %d failed", buf_size_);
+        Debug::notifyError("Server Alloc Memory size %d failed", buf_size_);
     }
     else
     {
-        Debug::notifyInfo("Client Alloc Memory size %d successd", buf_size_);
+        Debug::notifyInfo("Server Alloc Memory size %d successd at %p", buf_size_, addr_);
     }
     rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, true, 0,
                                  sock_port, device_name, rdma_port); // RC

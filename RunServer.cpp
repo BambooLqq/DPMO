@@ -8,7 +8,7 @@ Server* server;
 struct Config
 {
     uint32_t sock_port_;
-    uint32_t ib_port_;
+    uint32_t ib_port_ = 1;
     std::string ib_dev_;
     std::string config_file_;
 } config;

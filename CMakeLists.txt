@@ -20,6 +20,7 @@ SET(DPMO_SRC
 )
 
 add_library(DPMO SHARED ${DPMO_SRC})
+target_link_libraries(DPMO ibverbs pthread)
 
 add_executable(test ${PROJECT_SOURCE_DIR}/testConfiguration.cpp)
 add_executable(server 
@@ -31,8 +32,12 @@ add_executable(client
         ${PROJECT_SOURCE_DIR}/src/Client.cpp
 )
 
-target_link_libraries(test DPMO ibverbs)
-target_link_libraries(server DPMO ibverbs pthread)
-target_link_libraries(client DPMO ibverbs pthread)
+add_executable(testRdmaSocket 
+        ${PROJECT_SOURCE_DIR}/testRdmaSocket.cpp
+)
+target_link_libraries(testRdmaSocket DPMO)
+target_link_libraries(test DPMO)
+target_link_libraries(server DPMO)
+target_link_libraries(client DPMO)
 
 

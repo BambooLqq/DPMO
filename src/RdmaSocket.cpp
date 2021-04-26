@@ -185,9 +185,9 @@ bool RdmaSocket::CreateSource()
 
     /* register the memory buffer */
     Debug::notifyInfo("Register Memory Region");
-    std::cout << "buf_size = " << buf_size_ << " buf_addr_ = " << std::hex << buf_addr_ << std::endl;
+    std::cout << "buf_size = " << buf_size_ << " buf_addr_ = " << (void*)buf_addr_ << std::endl;
 
-    mr_ = ibv_reg_mr(pd_, (void*)buf_addr_, buf_size_, mr_flags);
+    mr_ = ibv_reg_mr(pd_, (void*)buf_addr_, (size_t)buf_size_, mr_flags);
     if (mr_ == NULL)
     {
         Debug::notifyError("Memory registration failed");

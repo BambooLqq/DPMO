@@ -17,7 +17,8 @@ Client::Client(int sock_port, std::string config_file_path,
     }
     else
     {
-        Debug::notifyInfo("Client Alloc Memory size %d at addr: %llx successd", buf_size_, addr_);
+        Debug::notifyInfo("Client Alloc Memory size %d at addr: %p successd", buf_size_, addr_);
+        memset((char*)addr_, 0, buf_size_);
     }
     rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, false, 0, sock_port, device_name, rdma_port); // RC
 
