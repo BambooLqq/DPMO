@@ -17,8 +17,8 @@ class Client
     RdmaSocket* rdmasocket_;
     std::unordered_map<uint16_t, PeerConnection*> peers; // 连接信息
 
-    uint32_t addr_;     // mr_addr
-    uint32_t buf_size_; // default (node + 1) * 4MB
+    uint64_t addr_;     // mr_addr
+    uint64_t buf_size_; // default (node + 1) * 4MB
     uint16_t my_node_id;
 
     bool IsConnected(uint16_t node_id)

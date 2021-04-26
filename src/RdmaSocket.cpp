@@ -22,20 +22,20 @@ RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
                        uint32_t sock_port, std::string device_name,
                        uint32_t rdma_port)
     : device_name_(device_name),
+      sock_port_(sock_port),
+      rdma_port_(rdma_port),
+      gid_index_(0),
+      ctx_(NULL),
+      mr_(NULL),
+      pd_(NULL),
       buf_addr_(buf_addr),
       buf_size_(buf_size),
       conf_(conf),
-      mode_(mode),
-      is_new_client_(false),
-      is_server_(is_server),
-      is_running_(true),
-      rdma_port_(rdma_port),
-      sock_port_(sock_port),
-      gid_index_(0),
       max_node_id_(0),
-      ctx_(NULL),
-      pd_(NULL),
-      mr_(NULL),
+      mode_(mode),
+      is_running_(true),
+      is_server_(is_server),
+      is_new_client_(false),
       my_ip_("")
 {
     // create completion queue
@@ -107,7 +107,7 @@ bool RdmaSocket::CreateSource()
 
     ibv_device** device_list = NULL;
     ibv_device* dev = NULL;
-    int rc = 0, mr_flags, device_num, i;
+    int rc = 0, mr_flags, device_num;
     device_list = ibv_get_device_list(&device_num);
     if (device_list == NULL)
     {
@@ -258,13 +258,12 @@ bool RdmaSocket::ModifyQPtoInit(ibv_qp* qp)
 bool RdmaSocket::DestroySource()
 {
     bool rc = true;
-
     if (mr_)
     {
         if (ibv_dereg_mr(mr_))
         {
             Debug::notifyError("Failed to deregister MR");
-            rc = 1;
+            rc = false;
         }
     }
 
@@ -286,7 +285,7 @@ bool RdmaSocket::DestroySource()
         }
     }
 
-    return false;
+    return rc;
 }
 
 bool RdmaSocket::ModifyQPtoRTR(struct ibv_qp* qp, uint32_t remote_qpn,
@@ -530,7 +529,7 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
 
     // 交换控制信息
     local_metadata.rkey = mr_->rkey;
-    for (int i = 0; i < is_server_ ? 1 : QP_NUMBER; i++)
+    for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
     {
         local_metadata.qp_num[i] = peer->qp[i]->qp_num;
     }
@@ -550,7 +549,7 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
     peer->lid = remote_metata.lid;
     peer->buf_addr = remote_metata.buf_addr;
     memcpy(peer->gid, remote_metata.gid, 16);
-    for (int i = 0; i < is_server_ ? 1 : QP_NUMBER; i++)
+    for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
     {
         peer->qp_num[i] = remote_metata.qp_num[i];
     }
@@ -625,7 +624,7 @@ bool RdmaSocket::CreateQueuePair(PeerConnection* peer)
     attr.cap.max_recv_sge = 1;
     attr.cap.max_inline_data = 0;
 
-    for (int i = 0; i < is_server_ ? 1 : QP_NUMBER; i++)
+    for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
     {
         peer->qp[i] = ibv_create_qp(pd_, &attr);
         Debug::notifyInfo("Create Queue Pair with Num = %d", peer->qp[i]->qp_num);
@@ -840,6 +839,7 @@ bool RdmaSocket::OutboundHamal(PeerConnection* peer, uint64_t buffer_send,
         total_size += send_size;
     }
     __sync_fetch_and_add(&transfer_count, 1);
+    return true;
 }
 
 bool RdmaSocket::RemoteWrite(PeerConnection* peer, uint64_t buffer_send,
@@ -989,7 +989,7 @@ bool RdmaSocket::RemoteRead(PeerConnection* peer, uint64_t buffer_recv,
     }
 }
 
-bool RdmaSocket::DataTransferWorker(int worker_id)
+void RdmaSocket::DataTransferWorker(int worker_id)
 {
     TransferTask* task;
     while (is_running_)
@@ -1045,4 +1045,5 @@ void RdmaSocket::RdmaQueryQueuePair(struct ibv_qp* qp)
         Debug::notifyInfo("QP state: state: IBV_QPS_UNKNOWN\n");
         break;
     }
+    return;
 }

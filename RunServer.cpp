@@ -43,7 +43,7 @@ static void usage(const char* argv0)
 static void print_config(void)
 {
     fprintf(stdout, " ------------------------------------------------\n");
-    fprintf(stdout, " Device name : \"%s\"\n", config.ib_dev_);
+    fprintf(stdout, " Device name : \"%s\"\n", config.ib_dev_.c_str());
     fprintf(stdout, " IB port : %u\n", config.ib_port_);
     fprintf(stdout, " TCP port : %u\n", config.sock_port_);
     if (config.config_file_.size() > 0)
@@ -104,6 +104,7 @@ int main(int argc, char** argv)
     {
         return 1;
     }
+    print_config();
     signal(SIGINT, Stop);
     server = new Server(config.sock_port_, config.config_file_, config.ib_dev_, config.ib_port_);
     // while (true)

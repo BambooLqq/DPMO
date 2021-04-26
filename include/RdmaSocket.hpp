@@ -163,8 +163,8 @@ private:
     ibv_context* ctx_;
     ibv_mr* mr_;
     ibv_pd* pd_;
-    uint32_t buf_addr_; // buf地址
-    uint32_t buf_size_; // buf size
+    uint64_t buf_addr_; // buf地址
+    uint64_t buf_size_; // buf size
 
     Configuration* conf_;
 
@@ -203,7 +203,7 @@ private:
 
     int SockSyncData(int sock, int size, char* local_data, char* remote_data);
 
-    bool DataTransferWorker(int id);
+    void DataTransferWorker(int id);
 
     void AddClient(uint16_t node_id, std::string ip)
     {

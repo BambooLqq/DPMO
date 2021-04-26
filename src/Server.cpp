@@ -8,7 +8,7 @@ Server::Server(int sock_port, std::string config_file_path,
     buf_size_ = FOURMB * (MAX_CLIENT_NUM)*2;
     int ret = posix_memalign((void**)&addr_, PAGESIZE, buf_size_);
 
-    if (ret == 0 || (uintptr_t)addr_ == NULL)
+    if (ret == 0 || (void*)addr_ == NULL)
     {
         Debug::notifyError("Client Alloc Memory size %d failed", buf_size_);
     }
@@ -124,7 +124,7 @@ void Server::Accecpt(int sock)
             {
                 rdmasocket_->RdmaRecv(peer->qp[0], GetClientRecvBaseAddr(peer->node_id), FOURMB);
             }
-            std::thread* poll_cq_ = new std::thread(&ProcessRequest, this, peer->node_id);
+            std::thread* poll_cq_ = new std::thread(&Server::ProcessRequest, this, peer->node_id);
             poll_request[peer->node_id] = poll_cq_;
             Debug::debugItem("Accepted to Node%d", peer->node_id);
         }
@@ -153,4 +153,8 @@ PeerConnection* Server::GetPeerConnection(uint16_t nodeid)
 
 void Server::ProcessRequest(uint16_t nodeid)
 {
+    while (is_running_)
+    {
+        return;
+    }
 }
