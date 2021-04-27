@@ -36,8 +36,8 @@ class Server
 {
     Configuration* conf_;
     RdmaSocket* rdmasocket_;
-    std::unordered_map<uint16_t, PeerConnection*> peers; // 连接信息
-    std::unordered_map<uint16_t, std::thread*> poll_request;
+    std::unordered_map<uint16_t, PeerConnection*> peers;     // 连接信息
+    std::unordered_map<uint16_t, std::thread*> poll_request; // 暂时使用多线程 后续考虑线程池
 
     uint64_t addr_;     // mr_addr
     uint64_t buf_size_; // default (node + 1) * 8MB
@@ -67,20 +67,29 @@ public:
 
     uint64_t GetClientSendBaseAddr(uint16_t node_id)
     {
-        if (node_id < conf_->getClientCount())
+        if (IsConnected(node_id == false))
         {
-            return addr_ + FOURMB * 2 * (node_id - 1);
+            return 0;
         }
-        return 0;
+        return peers[node_id]->my_buf_addr_;
     }
 
     uint64_t GetClientRecvBaseAddr(uint16_t node_id)
     {
-        if (node_id < conf_->getClientCount())
+        if (IsConnected(node_id == false))
         {
-            return addr_ + FOURMB * 2 * (node_id - 1) + FOURMB;
+            return 0;
         }
-        return 0;
+        return peers[node_id]->my_buf_addr_ + FOURMB;
+    }
+
+    uint64_t GetPeerRecvBaseAddr(uint16_t node_id)
+    {
+        if (IsConnected(node_id == false))
+        {
+            return 0;
+        }
+        return peers[node_id]->peer_buf_addr_;
     }
 
     void Listen();
@@ -88,7 +97,7 @@ public:
 
     void RdmaQueryQueuePair(uint16_t node_id);
 
-    void ProcessRequest(uint16_t nodeid); // 处理与Nodeid连接的请求
+    void ProcessRequest(PeerConnection* peer); // 处理与Nodeid连接的请求
 
     PeerConnection* GetPeerConnection(uint16_t nodeid);
 };

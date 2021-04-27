@@ -15,6 +15,7 @@
 // used for client or server's worker thread
 // 队列实现 保证多线程的原子性和并发性
 
+// 任务队列
 template<typename T>
 class Queue
 {
@@ -77,4 +78,14 @@ public:
         return __sync_fetch_and_add(&offset, 0);
     }
 };
+
+typedef enum
+{
+    NEWPOOL,
+    GETPOOL,
+    DELETEPOOL,
+
+} Message;
+
+
 #endif // !_GLOBAL_H

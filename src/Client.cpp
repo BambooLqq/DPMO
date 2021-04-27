@@ -6,7 +6,7 @@ Client::Client(int sock_port, std::string config_file_path,
 {
     conf_ = new Configuration(config_file_path);
     addr_ = 0;
-    buf_size_ = 4096;
+    buf_size_ = (MAX_CLIENT_NUM + 1) * FOURMB * 2;
 
     addr_ = reinterpret_cast<uint64_t>(memalign(PAGESIZE, buf_size_));
 
@@ -20,23 +20,24 @@ Client::Client(int sock_port, std::string config_file_path,
         memset((char*)addr_, 0, buf_size_);
     }
     rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, false, 0, sock_port, device_name, rdma_port); // RC
-
+    is_running_ = true;
     if (ConnectServer())
     {
-        my_node_id = rdmasocket_->GetNodeId();
+        my_node_id_ = rdmasocket_->GetNodeId();
         Debug::notifyInfo("Client Connects server successfully, node id = %d",
-                          my_node_id);
+                          my_node_id_);
     }
     else
     {
         Debug::notifyError("Client connects server failed");
     }
 
-    // rdmasocket_->RdmaListen(); //等待其他机器连接
+    rdmasocket_->RdmaListen();
 }
 
 Client::~Client()
 {
+    is_running_ = false;
     Debug::notifyInfo("Stop RPCClient.");
     if (conf_)
     {
@@ -53,23 +54,6 @@ Client::~Client()
         free((void*)addr_);
     }
     Debug::notifyInfo("RPCClient is closed successfully.");
-}
-
-uint64_t Client::GetClientBaseAddr(uint16_t node_id)
-{
-    if (node_id < my_node_id)
-    {
-        return addr_ + node_id * FOURMB;
-    }
-    else if (node_id <= MAX_CLIENT_NUM)
-    {
-        return addr_ + (node_id - 1) * FOURMB;
-    }
-    else
-    {
-        Debug::notifyError("node %d > max_node_num", node_id);
-        return 0;
-    }
 }
 
 bool Client::ConnectServer()
@@ -152,5 +136,60 @@ PeerConnection* Client::GetPeerConnection(uint16_t nodeid)
     {
         Debug::notifyInfo("Not Connected with nodeid %d", nodeid);
         return NULL;
+    }
+}
+
+void Client::Accept(int sock)
+{
+    struct sockaddr_in remote_address;
+    int fd;
+    // struct timespec start, end;
+    socklen_t sin_size = sizeof(struct sockaddr_in);
+    while (is_running_ && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size)) != -1)
+    {
+        Debug::notifyInfo("Accept a client");
+        PeerConnection* peer = new PeerConnection();
+        peer->sock = fd;
+        if (rdmasocket_->ConnectQueuePair(peer) == false)
+        {
+            Debug::notifyError("RDMA connect with error");
+            delete peer;
+        }
+        else
+        {
+            peer->counter = 0;
+            peers[peer->node_id] = peer;
+            Debug::notifyInfo("Client %d Connect Server %d", peer->node_id,
+                              my_node_id_);
+            /* Rdma Receive in Advance. */
+            // 接收recv请求
+            for (int i = 0; i < QPS_MAX_DEPTH; i++)
+            {
+                // rdmasocket_->RdmaRecv(peer->qp[0], GetClientRecvBaseAddr(peer->node_id), FOURMB);
+            }
+            // std::thread* poll_cq_ = new std::thread(&Server::ProcessRequest, this, peer->node_id);
+            // poll_request[peer->node_id] = poll_cq_;
+            Debug::debugItem("Accepted to Node%d", peer->node_id);
+        }
+    }
+}
+
+void Client::Listen()
+{
+    int sock_ = rdmasocket_->RdmaListen();
+}
+
+bool Client::SendMessageToServer()
+{
+    char buf[128];
+    struct ibv_wc wc[1];
+    const char hello[20] = "Hello Server";
+    memcpy(buf, hello, sizeof(hello));
+    memcpy((void*)GetServerSendBaseAddr(), buf, sizeof(buf));
+
+    rdmasocket_->RdmaSend(peers[0]->qp[0], GetServerSendBaseAddr(), sizeof(buf));
+    if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+    {
+        std::cout << "Send Success";
     }
 }

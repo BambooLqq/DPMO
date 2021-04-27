@@ -498,10 +498,8 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
         rc = 1;
         goto ConnectQPExit;
     }
-    std::cout << "begin" << std::endl;
     // peer->peer_ip = remote_id->peer_ip;
     memcpy(peer->peer_ip, remote_id->peer_ip, sizeof(remote_id->peer_ip));
-    std::cout << "end" << std::endl;
 
     if (is_server_)
     {
@@ -514,7 +512,7 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
             peer->node_id = max_node_id_;
             max_node_id_++;
             client_count_++;
-            // conf_->addClient(peer->node_id, peer->peer_ip);
+            conf_->addClient(peer->node_id, peer->peer_ip);
         }
     }
     else if (is_new_client_ && remote_id->is_server_or_new_client == 0)
@@ -548,13 +546,14 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
     }
 
     // 交换控制信息
+    peer->my_buf_addr_ = GetPeerAddr(peer->node_id);
     local_metadata.rkey = mr_->rkey;
     for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
     {
         local_metadata.qp_num[i] = peer->qp[i]->qp_num;
     }
     local_metadata.lid = port_attribute_.lid;
-    local_metadata.buf_addr = buf_addr_;
+    local_metadata.buf_addr = peer->my_buf_addr_ + FOURMB;
     memcpy(local_metadata.gid, &my_gid, 16);
     if (SockSyncData(peer->sock, sizeof(ExchangeRdmaMeta),
                      (char*)&local_metadata, (char*)&remote_metata)
@@ -567,7 +566,7 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
 
     peer->rkey = remote_metata.rkey;
     peer->lid = remote_metata.lid;
-    peer->buf_addr = remote_metata.buf_addr;
+    peer->peer_buf_addr_ = remote_metata.buf_addr;
     memcpy(peer->gid, remote_metata.gid, 16);
     for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
     {
@@ -819,7 +818,7 @@ bool RdmaSocket::RdmaWrite(PeerConnection* peer, uint64_t source_buffer,
         wr.imm_data = imm;
     }
     wr.send_flags = IBV_SEND_SIGNALED;
-    wr.wr.rdma.remote_addr = des_buffer + peer->buf_addr;
+    wr.wr.rdma.remote_addr = des_buffer + peer->peer_buf_addr_;
     Debug::debugItem("Post RDMA_WRITE with remote address = %lx",
                      wr.wr.rdma.remote_addr);
     wr.wr.rdma.rkey = peer->rkey;
@@ -928,7 +927,7 @@ bool RdmaSocket::RdmaRead(PeerConnection* peer, uint64_t buffer_recv,
     wr.num_sge = 1;
     wr.opcode = IBV_WR_RDMA_READ;
     wr.send_flags = IBV_SEND_SIGNALED;
-    wr.wr.rdma.remote_addr = des_offset + peer->buf_addr;
+    wr.wr.rdma.remote_addr = des_offset + peer->peer_buf_addr_;
     wr.wr.rdma.rkey = peer->rkey;
 
     if (ibv_post_send(peer->qp[worker_id], &wr, &wrBad))

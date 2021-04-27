@@ -56,7 +56,8 @@ public:
    */
 
     uint32_t qp_num[QP_NUMBER];
-    uint64_t buf_addr;
+    uint64_t peer_buf_addr_;
+    uint64_t my_buf_addr_;
     uint32_t rkey;
     uint16_t lid;
     uint8_t gid[16];
@@ -208,6 +209,19 @@ private:
     void AddClient(uint16_t node_id, std::string ip)
     {
         conf_->addClient(node_id, ip);
+    }
+
+    uint64_t GetPeerAddr(uint16_t node_id)
+    {
+        if (node_id < my_node_id_)
+        {
+            return buf_addr_ + FOURMB * 2 * node_id;
+        }
+        else if (node_id <= MAX_CLIENT_NUM)
+        {
+            return buf_addr_ + FOURMB * 2 * (node_id - 1);
+        }
+        return 0;
     }
 
 public:

@@ -108,6 +108,7 @@ int main(int argc, char** argv)
     print_config();
     signal(SIGINT, Stop);
     client = new Client(config.sock_port_, config.config_file_, config.ib_dev_, config.ib_port_);
+    client->SendMessageToServer();
     // while (true)
     // {
     //     getchar();

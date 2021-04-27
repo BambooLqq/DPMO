@@ -5,7 +5,7 @@ Server::Server(int sock_port, std::string config_file_path,
 {
     conf_ = new Configuration(config_file_path);
     addr_ = 0;
-    buf_size_ = FOURMB * (MAX_CLIENT_NUM)*2;
+    buf_size_ = FOURMB * (MAX_CLIENT_NUM + 1) * 2;
     int ret = posix_memalign((void**)&addr_, PAGESIZE, buf_size_);
 
     if (ret != 0 || (void*)addr_ == NULL)
@@ -54,6 +54,12 @@ Server::~Server()
         delete itr->second;
         itr->second = NULL;
     }
+
+    for (auto itr = poll_request.begin(); itr != poll_request.end(); itr++)
+    {
+        itr->second->join();
+    }
+    poll_request.clear();
     peers.clear();
     Debug::notifyInfo("RPCServer is closed successfully.");
 }
@@ -124,7 +130,7 @@ void Server::Accecpt(int sock)
             {
                 rdmasocket_->RdmaRecv(peer->qp[0], GetClientRecvBaseAddr(peer->node_id), FOURMB);
             }
-            std::thread* poll_cq_ = new std::thread(&Server::ProcessRequest, this, peer->node_id);
+            std::thread* poll_cq_ = new std::thread(&Server::ProcessRequest, this, peer);
             poll_request[peer->node_id] = poll_cq_;
             Debug::debugItem("Accepted to Node%d", peer->node_id);
         }
@@ -151,10 +157,41 @@ PeerConnection* Server::GetPeerConnection(uint16_t nodeid)
     }
 }
 
-void Server::ProcessRequest(uint16_t nodeid)
+void Server::ProcessRequest(PeerConnection* peer) //
 {
+    if (peer == NULL)
+    {
+        Debug::notifyError("ProcessRequest: peer is NULL");
+        return;
+    }
     while (is_running_)
     {
+        struct ibv_wc wc[1];
+        int ret = 0;
+        if ((ret = rdmasocket_->PollCompletion(peer->cq, 1, wc)) <= 0)
+        {
+            // failed
+        }
+        else
+        {
+            switch (wc->opcode) // 对于server 应该只有send recv
+            {
+            case IBV_WC_RECV:
+                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id) << std::endl;
+                break;
+            case IBV_WC_RECV_RDMA_WITH_IMM:
+                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id) << std::endl;
+                break;
+            case IBV_WC_SEND:
+                break;
+            case IBV_WC_RDMA_WRITE:
+                break;
+            case IBV_WC_RDMA_READ:
+                break;
+            default:
+                break;
+            }
+        }
         return;
     }
 }

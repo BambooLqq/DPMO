@@ -19,7 +19,9 @@ class Client
 
     uint64_t addr_;     // mr_addr
     uint64_t buf_size_; // default (node + 1) * 4MB
-    uint16_t my_node_id;
+    uint16_t my_node_id_;
+
+    bool is_running_;
 
     bool IsConnected(uint16_t node_id)
     {
@@ -30,21 +32,68 @@ class Client
         return true;
     }
 
+    uint64_t GetServerSendBaseAddr()
+    {
+        if (IsConnected(0) == false)
+        {
+            return 0;
+        }
+
+        return peers[0]->my_buf_addr_;
+    }
+
+    uint64_t GetServerRecvBaseAddr()
+    {
+        if (IsConnected(0) == false)
+        {
+            return 0;
+        }
+        return peers[0]->my_buf_addr_ + FOURMB;
+    }
+
+    uint64_t GetClientSendBaseAddr(uint16_t node_id)
+    {
+        if (IsConnected(node_id) == false)
+        {
+            return 0;
+        }
+        return peers[node_id]->my_buf_addr_;
+    }
+
+    uint64_t GetClientRecvBaseAddr(uint16_t node_id)
+    {
+        if (IsConnected(node_id) == false)
+        {
+            return 0;
+        }
+        return peers[node_id]->my_buf_addr_ + FOURMB;
+    }
+
+    uint64_t GetPeerRecvBaseAddr(uint64_t node_id)
+    {
+        if (IsConnected(node_id) == false)
+        {
+            return 0;
+        }
+        return peers[node_id]->peer_buf_addr_;
+    }
+
 public:
     Client(int sock_port = 0, std::string config_file_path = "",
            std::string device_name = "", uint32_t rdma_port = 1);
     ~Client();
-    uint64_t GetServerBaseAddr()
-    {
-        return addr_;
-    }
-    uint64_t GetClientBaseAddr(uint16_t node_id);
 
     bool ConnectServer();
 
     bool ConnectClient(uint16_t node_id);
 
+    void Listen(); //等待其他client连接
+
+    void Accept(int sock);
+
     PeerConnection* GetPeerConnection(uint16_t nodeid);
+
+    bool SendMessageToServer();
 };
 
 #endif // !_CLIENT_H
