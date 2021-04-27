@@ -50,8 +50,18 @@ RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
         hent = gethostbyname(hname);
         my_ip_ = inet_ntoa(*(struct in_addr*)(hent->h_addr_list[0]));
 
-        my_node_id_ = conf->getIDbyIP(my_ip_); // default is 0
-        Debug::notifyInfo("IP = %s, NodeID = %d", my_ip_.c_str(), my_node_id_);
+        // my_node_id_ = conf->getIDbyIP(my_ip_); // default is 0
+        if (my_ip_ != conf_->getServerIP())
+        {
+            Debug::notifyError("Your Ip is %s, config's server ip is %s",
+                               my_ip_.c_str(), conf_->getServerIP().c_str());
+        }
+        else
+        {
+            my_node_id_ = conf_->getServerNodeID();
+            Debug::notifyInfo("IP = %s, NodeID = %d",
+                              my_ip_.c_str(), my_node_id_);
+        }
     }
     else
     { // client
@@ -358,6 +368,7 @@ int RdmaSocket::SocketConnect(uint16_t node_id)
     struct timeval timeout = {3, 0};
     memset(&remote_address, 0, sizeof(remote_address));
     remote_address.sin_family = AF_INET;
+    std::cout << "server_ip is " << conf_->getIPbyID(node_id) << std::endl;
     inet_aton(conf_->getIPbyID(node_id).c_str(),
               (struct in_addr*)&remote_address.sin_addr);
     remote_address.sin_port = htons(sock_port_);
@@ -446,7 +457,8 @@ int RdmaSocket::RdmaListen()
 
 bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
 {
-    ExchangeID local_id, remote_id;
+    ExchangeID *local_id = new ExchangeID(),
+               *remote_id = new ExchangeID();
     ExchangeRdmaMeta local_metadata, remote_metata;
 
     int rc = 0;
@@ -456,58 +468,64 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
     // 交换ID 主要目的是
     if (is_server_)
     {
-        local_id.is_server_or_new_client = 0;
-        local_id.node_id = my_node_id_;
-        local_id.peer_ip = my_ip_;
-        local_id.given_id = max_node_id_;
+        local_id->is_server_or_new_client = 0;
+        local_id->node_id = my_node_id_;
+        memcpy(local_id->peer_ip, my_ip_.c_str(), my_ip_.size());
+        local_id->given_id = max_node_id_;
     }
     else if (is_new_client_ == false)
     {
-        local_id.is_server_or_new_client = 1;
-        local_id.node_id = my_node_id_;
-        local_id.peer_ip = my_ip_;
-        local_id.given_id = 0;
+        local_id->is_server_or_new_client = 1;
+        local_id->node_id = my_node_id_;
+        // local_id->peer_ip = my_ip_;
+        memcpy(local_id->peer_ip, my_ip_.c_str(), my_ip_.size());
+        local_id->given_id = 0;
     }
     else if (is_new_client_)
     {
-        local_id.is_server_or_new_client = 2;
-        local_id.peer_ip = my_ip_;
+        local_id->is_server_or_new_client = 2;
+        // local_id->peer_ip = my_ip_;
+        memcpy(local_id->peer_ip, my_ip_.c_str(), my_ip_.size());
     }
 
-    if (SockSyncData(peer->sock, sizeof(ExchangeID), (char*)&local_id,
-                     (char*)&remote_id)
+    if (SockSyncData(peer->sock, sizeof(ExchangeID), (char*)local_id,
+                     (char*)remote_id)
         < 0)
     {
         Debug::notifyError("failed to exchange connection data between sides");
         rc = 1;
         goto ConnectQPExit;
     }
-    peer->peer_ip = remote_id.peer_ip;
+    std::cout << "begin" << std::endl;
+    // peer->peer_ip = remote_id->peer_ip;
+    memcpy(peer->peer_ip, remote_id->peer_ip, sizeof(remote_id->peer_ip));
+    std::cout << "end" << std::endl;
+
     if (is_server_)
     {
-        if (remote_id.is_server_or_new_client == 1)
+        if (remote_id->is_server_or_new_client == 1)
         {
-            peer->node_id = remote_id.node_id;
+            peer->node_id = remote_id->node_id;
         }
-        else if (remote_id.is_server_or_new_client == 2)
+        else if (remote_id->is_server_or_new_client == 2)
         {
             peer->node_id = max_node_id_;
             max_node_id_++;
             client_count_++;
-            conf_->addClient(peer->node_id, peer->peer_ip);
+            // conf_->addClient(peer->node_id, peer->peer_ip);
         }
     }
-    else if (is_new_client_ && remote_id.is_server_or_new_client == 0)
+    else if (is_new_client_ && remote_id->is_server_or_new_client == 0)
     {
-        my_node_id_ = remote_id.given_id;
-        peer->node_id = remote_id.node_id;
+        my_node_id_ = remote_id->given_id;
+        peer->node_id = remote_id->node_id;
         is_new_client_ = false;
         client_count_++;
         conf_->addClient(my_node_id_, my_ip_);
     }
     else if (is_new_client_ == false)
     {
-        peer->node_id = remote_id.node_id;
+        peer->node_id = remote_id->node_id;
     }
 
     CreateQueuePair(peer);
@@ -555,7 +573,7 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
     }
 
     // 更换QP状态
-    for (int i = 0; i < QP_NUMBER; i++)
+    for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
     {
         /* modify the QP to init */
         ret = ModifyQPtoInit(peer->qp[i]);
@@ -584,6 +602,8 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
     }
 
 ConnectQPExit:
+    delete local_id;
+    delete remote_id;
     if (rc == 1)
     {
         return false;
@@ -609,7 +629,7 @@ bool RdmaSocket::CreateQueuePair(PeerConnection* peer)
     }
     attr.sq_sig_all = 0;
     peer->cq = ibv_create_cq(ctx_, QPS_MAX_DEPTH, NULL, NULL, 0);
-    if (peer->cq)
+    if (peer->cq == NULL)
     {
         Debug::notifyError("failed to create CQ");
         return false;

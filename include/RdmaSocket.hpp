@@ -63,16 +63,17 @@ public:
 
     int sock;
     uint16_t node_id;
-    std::string peer_ip;
+    char peer_ip[20];
 
     uint64_t counter = 0;
     ~PeerConnection();
 };
 
-typedef struct ExchangeID
+class ExchangeID
 {
+public:
     uint16_t node_id;
-    std::string peer_ip;
+    char peer_ip[20];
     // 0 - server
     // 1 - exist-client
     // 2 - new-client
@@ -80,8 +81,7 @@ typedef struct ExchangeID
     // used for new client without node id
     // server assigns a node_id for the new client
     uint16_t given_id;
-
-} ExchangeID;
+};
 
 // used for rdma connc
 typedef struct ExchangeRdmaMeta

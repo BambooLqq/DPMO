@@ -7,11 +7,10 @@ Client::Client(int sock_port, std::string config_file_path,
     conf_ = new Configuration(config_file_path);
     addr_ = 0;
     buf_size_ = 4096;
-    int ret = 0;
 
     addr_ = reinterpret_cast<uint64_t>(memalign(PAGESIZE, buf_size_));
 
-    if (ret != 0 || addr_ == 0)
+    if (addr_ == 0)
     {
         Debug::notifyError("Client Alloc Memory size %d failed", buf_size_);
     }
@@ -98,8 +97,10 @@ bool Client::ConnectServer()
     }
     else
     {
+        std::cout << "bengin2" << std::endl;
         peers[peer->node_id] = peer;
         peer->counter = 0;
+        std::cout << "bengin2" << std::endl;
         Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
         return true;
     }
