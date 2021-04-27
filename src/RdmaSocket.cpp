@@ -368,9 +368,11 @@ int RdmaSocket::SocketConnect(uint16_t node_id)
     struct timeval timeout = {3, 0};
     memset(&remote_address, 0, sizeof(remote_address));
     remote_address.sin_family = AF_INET;
-    std::cout << "server_ip is " << conf_->getIPbyID(node_id) << std::endl;
-    inet_aton(conf_->getIPbyID(node_id).c_str(),
-              (struct in_addr*)&remote_address.sin_addr);
+    std::string server_ip = node_id == 0 ? conf_->getServerIP()
+                                         : conf_->getIPbyID(node_id);
+    std::cout << "server_ip is " << server_ip << std::endl;
+
+    inet_aton(server_ip.c_str(), (struct in_addr*)&remote_address.sin_addr);
     remote_address.sin_port = htons(sock_port_);
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)
     {

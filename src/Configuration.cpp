@@ -99,8 +99,6 @@ Configuration::Configuration(std::string config_file_path)
         server_count_ = 1;
         server_nodeid_ = 0;
         server_ip_ = server.get<std::string>("ip");
-        id2ip_[server_nodeid_] = server_ip_;
-        ip2id_[server_ip_] = server_nodeid_;
     }
 
     for (BOOST_AUTO(pos, client.begin()); pos != client.end(); pos++)
@@ -112,11 +110,11 @@ Configuration::Configuration(std::string config_file_path)
             Debug::notifyError("Client's node id must not equals 0!");
             exit(1);
         }
-        // if (ip2id_.find(clientip) != ip2id_.end())
-        // {
-        //     Debug::notifyError("ip %s is existed!", clientip.c_str());
-        //     exit(1);
-        // }
+        if (ip2id_.find(clientip) != ip2id_.end())
+        {
+            Debug::notifyError("ip %s is existed!", clientip.c_str());
+            exit(1);
+        }
         if (id2ip_.find(nodeid) != id2ip_.end())
         {
             Debug::notifyError("id %d is existed!", nodeid);
