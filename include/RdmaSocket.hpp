@@ -255,42 +255,46 @@ public:
     int PollCompletion(struct ibv_cq* cq, int poll_number, struct ibv_wc* wc);
 
     // 拉取poll_Number个wc 放在wc数组中
-    int PollCompletionOnce(struct ibv_cq* cq, int poll_number, struct ibv_wc* wc);
+    int PollCompletionOnce(struct ibv_cq* cq, int poll_number,
+                           struct ibv_wc* wc);
 
     // nodeid 发送到nodeid
     // source buffer keep sending data
     // buffer_size sending data size
     // source_buffer 为地址
-    bool RdmaSend(struct ibv_qp* qp, uint64_t source_buffer, uint64_t buffer_size);
+    bool RdmaSend(struct ibv_qp* qp, uint64_t source_buffer,
+                  uint64_t buffer_size);
 
     // nodeid 发送到nodeid
     // source buffer keep receving data
     // buffer_size recving data size
     // source_buffer 为地址
-    bool RdmaRecv(struct ibv_qp* qp, uint64_t source_buffer, uint64_t buffer_size);
+    bool RdmaRecv(struct ibv_qp* qp, uint64_t source_buffer,
+                  uint64_t buffer_size);
 
     // source buffer为发送数据的绝对地址
     // des_buffer 为要写入的相对地址
     // imm -1 为 RDMA_WRITE
     // read write 用于Client间读取数据
 
-    bool RdmaWrite(PeerConnection* peer, uint64_t buffer_send, uint64_t recv_offset,
-                   uint64_t size, uint32_t imm, int worker_id);
+    bool RdmaWrite(PeerConnection* peer, uint64_t buffer_send,
+                   uint64_t recv_offset, uint64_t size, uint32_t imm,
+                   int worker_id);
 
     bool OutboundHamal(PeerConnection* peer, uint64_t buffer_send,
                        uint64_t recv_offset, uint64_t size, int worker_id);
-    bool RemoteWrite(PeerConnection* peer, uint64_t buffer_send, uint64_t recv_offset,
-                     uint64_t size);
+    bool RemoteWrite(PeerConnection* peer, uint64_t buffer_send,
+                     uint64_t recv_offset, uint64_t size);
 
     // buffer_recv 为接收数据的绝对地址
     // des_buffer 为读取数据的相对地址
     // size读取数据的大小
-    bool RdmaRead(PeerConnection* peer, uint64_t buffer_recv, uint64_t des_offset,
-                  uint64_t size, int worker_id);
-    bool InboundHamal(PeerConnection* peer, uint64_t buffer_recv, uint64_t des_offset,
-                      uint64_t size, int worker_id);
-    bool RemoteRead(PeerConnection* peer, uint64_t buffer_recv, uint64_t des_offset,
-                    uint64_t size);
+    bool RdmaRead(PeerConnection* peer, uint64_t buffer_recv,
+                  uint64_t des_offset, uint64_t size, int worker_id);
+    bool InboundHamal(PeerConnection* peer, uint64_t buffer_recv,
+                      uint64_t des_offset, uint64_t size, int worker_id);
+    bool RemoteRead(PeerConnection* peer, uint64_t buffer_recv,
+                    uint64_t des_offset, uint64_t size);
 
     void RdmaQueryQueuePair(struct ibv_qp* qp);
 };

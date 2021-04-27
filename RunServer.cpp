@@ -20,12 +20,12 @@ void Stop(int signo)
     Debug::notifyInfo("Server is terminated, Bye.");
     _exit(0);
 }
-static struct option long_options[5] = {
-    {.name = "port", .has_arg = 1, .flag = 0, .val = 'p'},
-    {.name = "ib-dev", .has_arg = 1, .flag = 0, .val = 'd'},
-    {.name = "ib-port", .has_arg = 1, .flag = 0, .val = 'i'},
-    {.name = "config-file", .has_arg = 1, .flag = 0, .val = 'c'},
-    {.name = NULL, .has_arg = 0, .flag = 0, .val = '\0'}};
+static struct option long_options[5]
+    = {{.name = "port", .has_arg = 1, .flag = 0, .val = 'p'},
+       {.name = "ib-dev", .has_arg = 1, .flag = 0, .val = 'd'},
+       {.name = "ib-port", .has_arg = 1, .flag = 0, .val = 'i'},
+       {.name = "config-file", .has_arg = 1, .flag = 0, .val = 'c'},
+       {.name = NULL, .has_arg = 0, .flag = 0, .val = '\0'}};
 
 static void usage(const char* argv0)
 {
@@ -34,9 +34,14 @@ static void usage(const char* argv0)
     fprintf(stdout, " %s <host> connect to server at <host>\n", argv0);
     fprintf(stdout, "\n");
     fprintf(stdout, "Options:\n");
-    fprintf(stdout, " -p, --port <port> listen on/connect to port <port> (default 0)\n");
-    fprintf(stdout, " -d, --ib-dev <dev> use IB device <dev> (default first device found)\n");
-    fprintf(stdout, " -i, --ib-port <port> use port <port> of IB device (default 1)\n");
+    fprintf(
+        stdout,
+        " -p, --port <port> listen on/connect to port <port> (default 0)\n");
+    fprintf(
+        stdout,
+        " -d, --ib-dev <dev> use IB device <dev> (default first device found)\n");
+    fprintf(stdout,
+            " -i, --ib-port <port> use port <port> of IB device (default 1)\n");
     fprintf(stdout, " -c, --config-file <config-file> config-file path\n");
 }
 
@@ -57,16 +62,11 @@ static int ParseArgv(int argc, char** argv)
     {
         int c;
         c = getopt_long(argc, argv, "p:d:i:c:", long_options, NULL);
-        if (c == -1)
-            break;
+        if (c == -1) break;
         switch (c)
         {
-        case 'p':
-            config.sock_port_ = strtoul(optarg, NULL, 0);
-            break;
-        case 'd':
-            config.ib_dev_ = strdup(optarg);
-            break;
+        case 'p': config.sock_port_ = strtoul(optarg, NULL, 0); break;
+        case 'd': config.ib_dev_ = strdup(optarg); break;
         case 'i':
             config.ib_port_ = strtoul(optarg, NULL, 0);
             if (config.ib_port_ < 0)
@@ -86,9 +86,7 @@ static int ParseArgv(int argc, char** argv)
                 config.config_file_ = optarg;
             }
             break;
-        default:
-            usage(argv[0]);
-            return 1;
+        default: usage(argv[0]); return 1;
         }
     }
     if (optind < argc)
@@ -106,7 +104,8 @@ int main(int argc, char** argv)
     }
     print_config();
     signal(SIGINT, Stop);
-    server = new Server(config.sock_port_, config.config_file_, config.ib_dev_, config.ib_port_);
+    server = new Server(config.sock_port_, config.config_file_, config.ib_dev_,
+                        config.ib_port_);
     // while (true)
     // {
     //     getchar();

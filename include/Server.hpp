@@ -36,8 +36,9 @@ class Server
 {
     Configuration* conf_;
     RdmaSocket* rdmasocket_;
-    std::unordered_map<uint16_t, PeerConnection*> peers;     // 连接信息
-    std::unordered_map<uint16_t, std::thread*> poll_request; // 暂时使用多线程 后续考虑线程池
+    std::unordered_map<uint16_t, PeerConnection*> peers; // 连接信息
+    std::unordered_map<uint16_t, std::thread*>
+        poll_request; // 暂时使用多线程 后续考虑线程池
 
     uint64_t addr_;     // mr_addr
     uint64_t buf_size_; // default (node + 1) * 8MB

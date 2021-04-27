@@ -14,10 +14,11 @@ Server::Server(int sock_port, std::string config_file_path,
     }
     else
     {
-        Debug::notifyInfo("Server Alloc Memory size %d successd at %p", buf_size_, addr_);
+        Debug::notifyInfo("Server Alloc Memory size %d successd at %p",
+                          buf_size_, addr_);
     }
-    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, true, 0,
-                                 sock_port, device_name, rdma_port); // RC
+    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, true, 0, sock_port,
+                                 device_name, rdma_port); // RC
     is_running_ = true;
 
     Listen();
@@ -107,7 +108,9 @@ void Server::Accecpt(int sock)
     int fd;
     // struct timespec start, end;
     socklen_t sin_size = sizeof(struct sockaddr_in);
-    while (is_running_ && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size)) != -1)
+    while (is_running_
+           && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size))
+                  != -1)
     {
         Debug::notifyInfo("Accept a client");
         PeerConnection* peer = new PeerConnection();
@@ -128,9 +131,11 @@ void Server::Accecpt(int sock)
             // 接收recv请求
             for (int i = 0; i < QPS_MAX_DEPTH; i++)
             {
-                rdmasocket_->RdmaRecv(peer->qp[0], GetClientRecvBaseAddr(peer->node_id), FOURMB);
+                rdmasocket_->RdmaRecv(
+                    peer->qp[0], GetClientRecvBaseAddr(peer->node_id), FOURMB);
             }
-            std::thread* poll_cq_ = new std::thread(&Server::ProcessRequest, this, peer);
+            std::thread* poll_cq_
+                = new std::thread(&Server::ProcessRequest, this, peer);
             poll_request[peer->node_id] = poll_cq_;
             Debug::debugItem("Accepted to Node%d", peer->node_id);
         }
@@ -177,19 +182,17 @@ void Server::ProcessRequest(PeerConnection* peer) //
             switch (wc->opcode) // 对于server 应该只有send recv
             {
             case IBV_WC_RECV:
-                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id) << std::endl;
+                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id)
+                          << std::endl;
                 break;
             case IBV_WC_RECV_RDMA_WITH_IMM:
-                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id) << std::endl;
+                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id)
+                          << std::endl;
                 break;
-            case IBV_WC_SEND:
-                break;
-            case IBV_WC_RDMA_WRITE:
-                break;
-            case IBV_WC_RDMA_READ:
-                break;
-            default:
-                break;
+            case IBV_WC_SEND: break;
+            case IBV_WC_RDMA_WRITE: break;
+            case IBV_WC_RDMA_READ: break;
+            default: break;
             }
         }
         return;

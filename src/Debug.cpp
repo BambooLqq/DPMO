@@ -92,7 +92,8 @@ void Debug::startTimer(const char* timerName)
     if (TIMER == true)
     { /* If debug option is set. */
         // printf("%s is started.\n", timerName);
-        Debug::startTime = tv.tv_sec * 1000 * 1000 + tv.tv_usec; /* Convert to milliseconds and save. */
+        Debug::startTime = tv.tv_sec * 1000 * 1000
+                           + tv.tv_usec; /* Convert to milliseconds and save. */
     }
 }
 
@@ -104,8 +105,9 @@ void Debug::endTimer()
     gettimeofday(&tv, &tz); /* Get end time. */
     long endTime;
     if (TIMER == true)
-    {                                                   /* If debug option is set. */
-        endTime = tv.tv_sec * 1000 * 1000 + tv.tv_usec; /* Convert to milliseconds. */
+    { /* If debug option is set. */
+        endTime = tv.tv_sec * 1000 * 1000
+                  + tv.tv_usec; /* Convert to milliseconds. */
         printf("Timer is ended. Cost %ld us.\n", (endTime - Debug::startTime));
     }
 }

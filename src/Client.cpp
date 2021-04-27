@@ -16,10 +16,12 @@ Client::Client(int sock_port, std::string config_file_path,
     }
     else
     {
-        Debug::notifyInfo("Client Alloc Memory size %d at addr: %p successd", buf_size_, addr_);
+        Debug::notifyInfo("Client Alloc Memory size %d at addr: %p successd",
+                          buf_size_, addr_);
         memset((char*)addr_, 0, buf_size_);
     }
-    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, false, 0, sock_port, device_name, rdma_port); // RC
+    rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, false, 0, sock_port,
+                                 device_name, rdma_port); // RC
     is_running_ = true;
     if (ConnectServer())
     {
@@ -31,8 +33,7 @@ Client::Client(int sock_port, std::string config_file_path,
     {
         Debug::notifyError("Client connects server failed");
     }
-
-    rdmasocket_->RdmaListen();
+    Listen();
 }
 
 Client::~Client()
@@ -145,7 +146,9 @@ void Client::Accept(int sock)
     int fd;
     // struct timespec start, end;
     socklen_t sin_size = sizeof(struct sockaddr_in);
-    while (is_running_ && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size)) != -1)
+    while (is_running_
+           && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size))
+                  != -1)
     {
         Debug::notifyInfo("Accept a client");
         PeerConnection* peer = new PeerConnection();
@@ -159,7 +162,7 @@ void Client::Accept(int sock)
         {
             peer->counter = 0;
             peers[peer->node_id] = peer;
-            Debug::notifyInfo("Client %d Connect Server %d", peer->node_id,
+            Debug::notifyInfo("Client %d Connect Client %d", peer->node_id,
                               my_node_id_);
             /* Rdma Receive in Advance. */
             // 接收recv请求
@@ -177,6 +180,7 @@ void Client::Accept(int sock)
 void Client::Listen()
 {
     int sock_ = rdmasocket_->RdmaListen();
+    Accept(sock_);
 }
 
 bool Client::SendMessageToServer()
@@ -187,7 +191,8 @@ bool Client::SendMessageToServer()
     memcpy(buf, hello, sizeof(hello));
     memcpy((void*)GetServerSendBaseAddr(), buf, sizeof(buf));
 
-    rdmasocket_->RdmaSend(peers[0]->qp[0], GetServerSendBaseAddr(), sizeof(buf));
+    rdmasocket_->RdmaSend(peers[0]->qp[0], GetServerSendBaseAddr(),
+                          sizeof(buf));
     if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
     {
         std::cout << "Send Success";

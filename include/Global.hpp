@@ -87,5 +87,4 @@ typedef enum
 
 } Message;
 
-
 #endif // !_GLOBAL_H

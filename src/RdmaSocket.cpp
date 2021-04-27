@@ -41,7 +41,7 @@ RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
     // create completion queue
     server_count_ = conf_->getServerCount();
     client_count_ = conf->getClientCount(); // server的nodeid 默认为0
-    max_node_id_ = client_count_ + 1;       //当有新的client加入时 为他分配的id
+    max_node_id_ = client_count_ + 1; //当有新的client加入时 为他分配的id
     if (is_server)
     {
         char hname[128];
@@ -59,8 +59,8 @@ RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
         else
         {
             my_node_id_ = conf_->getServerNodeID();
-            Debug::notifyInfo("IP = %s, NodeID = %d",
-                              my_ip_.c_str(), my_node_id_);
+            Debug::notifyInfo("IP = %s, NodeID = %d", my_ip_.c_str(),
+                              my_node_id_);
         }
     }
     else
@@ -80,7 +80,8 @@ RdmaSocket::RdmaSocket(uint64_t buf_addr, uint64_t buf_size,
         }
         else
         {
-            Debug::notifyInfo("IP = %s, NodeID = %d", my_ip_.c_str(), my_node_id_);
+            Debug::notifyInfo("IP = %s, NodeID = %d", my_ip_.c_str(),
+                              my_node_id_);
         }
     }
     CreateSource();
@@ -191,11 +192,13 @@ bool RdmaSocket::CreateSource()
         goto create_source_exit;
     }
 
-    mr_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
+    mr_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ
+               | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
 
     /* register the memory buffer */
     Debug::notifyInfo("Register Memory Region");
-    std::cout << "buf_size = " << buf_size_ << " buf_addr_ = " << (void*)buf_addr_ << std::endl;
+    std::cout << "buf_size = " << buf_size_
+              << " buf_addr_ = " << (void*)buf_addr_ << std::endl;
 
     mr_ = ibv_reg_mr(pd_, (void*)buf_addr_, (size_t)buf_size_, mr_flags);
     if (mr_ == NULL)
@@ -242,14 +245,17 @@ bool RdmaSocket::ModifyQPtoInit(ibv_qp* qp)
     ibv_qp_attr attr;
     int flags, rc;
     memset(&attr, 0, sizeof(ibv_qp_attr));
-    flags = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS;
+    flags
+        = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS;
 
     attr.qp_state = IBV_QPS_INIT;
     attr.port_num = rdma_port_;
     attr.pkey_index = 0;
     if (mode_ == 0)
     {
-        attr.qp_access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC | IBV_ACCESS_LOCAL_WRITE;
+        attr.qp_access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE
+                               | IBV_ACCESS_REMOTE_ATOMIC
+                               | IBV_ACCESS_LOCAL_WRITE;
     }
     else if (mode_ == 1)
     {
@@ -313,7 +319,8 @@ bool RdmaSocket::ModifyQPtoRTR(struct ibv_qp* qp, uint32_t remote_qpn,
     attr.ah_attr.sl = IB_SL;
     attr.ah_attr.src_path_bits = 0;
     attr.ah_attr.port_num = rdma_port_;
-    flags = IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN;
+    flags = IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN
+            | IBV_QP_RQ_PSN;
     if (mode_ == 0)
     {
         attr.max_dest_rd_atomic = 16;
@@ -347,7 +354,8 @@ bool RdmaSocket::ModifyQPtoRTS(struct ibv_qp* qp)
         attr.rnr_retry = 7;
         attr.max_rd_atomic = 16;
         attr.max_dest_rd_atomic = 16;
-        flags |= IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY | IBV_QP_MAX_QP_RD_ATOMIC;
+        flags |= IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY
+                 | IBV_QP_MAX_QP_RD_ATOMIC;
     }
     // attr.max_rd_atomic = 1;
     rc = ibv_modify_qp(qp, &attr, flags);
@@ -368,8 +376,8 @@ int RdmaSocket::SocketConnect(uint16_t node_id)
     struct timeval timeout = {3, 0};
     memset(&remote_address, 0, sizeof(remote_address));
     remote_address.sin_family = AF_INET;
-    std::string server_ip = node_id == 0 ? conf_->getServerIP()
-                                         : conf_->getIPbyID(node_id);
+    std::string server_ip
+        = node_id == 0 ? conf_->getServerIP() : conf_->getIPbyID(node_id);
     std::cout << "server_ip is " << server_ip << std::endl;
 
     inet_aton(server_ip.c_str(), (struct in_addr*)&remote_address.sin_addr);
@@ -384,7 +392,10 @@ int RdmaSocket::SocketConnect(uint16_t node_id)
     if (ret < 0) Debug::notifyError("Set timeout failed!");
 
     int t = 3;
-    while (t >= 0 && connect(sock, (struct sockaddr*)&remote_address, sizeof(struct sockaddr)) < 0)
+    while (t >= 0
+           && connect(sock, (struct sockaddr*)&remote_address,
+                      sizeof(struct sockaddr))
+                  < 0)
     {
         Debug::notifyError("Fail to connect to the server");
         t -= 1;
@@ -459,8 +470,7 @@ int RdmaSocket::RdmaListen()
 
 bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
 {
-    ExchangeID *local_id = new ExchangeID(),
-               *remote_id = new ExchangeID();
+    ExchangeID *local_id = new ExchangeID(), *remote_id = new ExchangeID();
     ExchangeRdmaMeta local_metadata, remote_metata;
 
     int rc = 0;
@@ -568,7 +578,8 @@ bool RdmaSocket::ConnectQueuePair(PeerConnection* peer)
     peer->lid = remote_metata.lid;
     peer->peer_buf_addr_ = remote_metata.buf_addr;
     memcpy(peer->gid, remote_metata.gid, 16);
-    for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
+    for (int i = 0;
+         i < (remote_id->is_server_or_new_client == 0 ? 1 : QP_NUMBER); i++)
     {
         peer->qp_num[i] = remote_metata.qp_num[i];
     }
@@ -648,7 +659,8 @@ bool RdmaSocket::CreateQueuePair(PeerConnection* peer)
     for (int i = 0; i < (is_server_ ? 1 : QP_NUMBER); i++)
     {
         peer->qp[i] = ibv_create_qp(pd_, &attr);
-        Debug::notifyInfo("Create Queue Pair with Num = %d", peer->qp[i]->qp_num);
+        Debug::notifyInfo("Create Queue Pair with Num = %d",
+                          peer->qp[i]->qp_num);
         if (!peer->qp[i])
         {
             Debug::notifyError("Failed to create QP");
@@ -669,7 +681,8 @@ int RdmaSocket::PollCompletion(struct ibv_cq* cq, int poll_number,
     }
 
     int count = 0;
-    do {
+    do
+    {
         count += ibv_poll_cq(cq, 1, wc);
     } while (count < poll_number);
 
@@ -848,15 +861,16 @@ bool RdmaSocket::OutboundHamal(PeerConnection* peer, uint64_t buffer_send,
     struct ibv_wc wc;
     while (total_size < size)
     {
-        send_size = (size - total_size) >= send_packet_size ? send_packet_size
-                                                            : ((size - total_size));
+        send_size = (size - total_size) >= send_packet_size
+                        ? send_packet_size
+                        : ((size - total_size));
 
         memcpy((void*)sendaddr, (void*)(buffer_send + total_size), send_size);
         RdmaWrite(peer, sendaddr, recv_offset + total_size, send_size, -1,
                   worker_id);
         PollCompletion(peer->cq, 1, &wc);
-        Debug::notifyInfo("Source Addr = %lx, Des Addr = %lx, Size = %d", sendaddr,
-                          recv_offset + total_size, send_size);
+        Debug::notifyInfo("Source Addr = %lx, Des Addr = %lx, Size = %d",
+                          sendaddr, recv_offset + total_size, send_size);
         total_size += send_size;
     }
     __sync_fetch_and_add(&transfer_count, 1);
@@ -939,8 +953,7 @@ bool RdmaSocket::RdmaRead(PeerConnection* peer, uint64_t buffer_recv,
 }
 
 bool RdmaSocket::InboundHamal(PeerConnection* peer, uint64_t buffer_recv,
-                              uint64_t des_offset, uint64_t size,
-                              int worker_id)
+                              uint64_t des_offset, uint64_t size, int worker_id)
 {
     if (peer == NULL)
     {
@@ -1023,8 +1036,8 @@ void RdmaSocket::DataTransferWorker(int worker_id)
         }
         else if (task->op_type == READ)
         {
-            InboundHamal(task->peer, task->send.buffer_recv, task->recv.des_offset,
-                         task->size, worker_id + 1);
+            InboundHamal(task->peer, task->send.buffer_recv,
+                         task->recv.des_offset, task->size, worker_id + 1);
         }
         delete task;
     }
@@ -1041,27 +1054,13 @@ void RdmaSocket::RdmaQueryQueuePair(struct ibv_qp* qp)
     ibv_query_qp(qp, &attr, IBV_QP_STATE, &init_attr);
     switch (attr.qp_state)
     {
-    case IBV_QPS_RESET:
-        Debug::notifyInfo("QP state: IBV_QPS_RESET\n");
-        break;
-    case IBV_QPS_INIT:
-        Debug::notifyInfo("QP state: IBV_QPS_INIT\n");
-        break;
-    case IBV_QPS_RTR:
-        Debug::notifyInfo("QP state: IBV_QPS_RTR\n");
-        break;
-    case IBV_QPS_RTS:
-        Debug::notifyInfo("QP state: IBV_QPS_RTS\n");
-        break;
-    case IBV_QPS_SQD:
-        Debug::notifyInfo("QP state: IBV_QPS_SQD\n");
-        break;
-    case IBV_QPS_SQE:
-        Debug::notifyInfo("QP state: IBV_QPS_SQE\n");
-        break;
-    case IBV_QPS_ERR:
-        Debug::notifyInfo("QP state: IBV_QPS_ERR\n");
-        break;
+    case IBV_QPS_RESET: Debug::notifyInfo("QP state: IBV_QPS_RESET\n"); break;
+    case IBV_QPS_INIT: Debug::notifyInfo("QP state: IBV_QPS_INIT\n"); break;
+    case IBV_QPS_RTR: Debug::notifyInfo("QP state: IBV_QPS_RTR\n"); break;
+    case IBV_QPS_RTS: Debug::notifyInfo("QP state: IBV_QPS_RTS\n"); break;
+    case IBV_QPS_SQD: Debug::notifyInfo("QP state: IBV_QPS_SQD\n"); break;
+    case IBV_QPS_SQE: Debug::notifyInfo("QP state: IBV_QPS_SQE\n"); break;
+    case IBV_QPS_ERR: Debug::notifyInfo("QP state: IBV_QPS_ERR\n"); break;
     case IBV_QPS_UNKNOWN:
         Debug::notifyInfo("QP state: state: IBV_QPS_UNKNOWN\n");
         break;

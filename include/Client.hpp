@@ -17,6 +17,8 @@ class Client
     RdmaSocket* rdmasocket_;
     std::unordered_map<uint16_t, PeerConnection*> peers; // 连接信息
 
+    std::unordered_map<uint16_t, std::thread*> poll_request_thread_;
+
     uint64_t addr_;     // mr_addr
     uint64_t buf_size_; // default (node + 1) * 4MB
     uint16_t my_node_id_;
@@ -78,20 +80,20 @@ class Client
         return peers[node_id]->peer_buf_addr_;
     }
 
+    void Listen(); //等待其他client连接
+
+    void Accept(int sock);
+
+    bool ConnectServer();
+
+    PeerConnection* GetPeerConnection(uint16_t nodeid);
+
 public:
     Client(int sock_port = 0, std::string config_file_path = "",
            std::string device_name = "", uint32_t rdma_port = 1);
     ~Client();
 
-    bool ConnectServer();
-
-    bool ConnectClient(uint16_t node_id);
-
-    void Listen(); //等待其他client连接
-
-    void Accept(int sock);
-
-    PeerConnection* GetPeerConnection(uint16_t nodeid);
+    bool ConnectClient(uint16_t node_id); //连接其他Client
 
     bool SendMessageToServer();
 };

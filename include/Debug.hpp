@@ -20,13 +20,13 @@ private:
     static long startTime; /* Last start time in milliseconds. */
 
 public:
-    static void debugTitle(const char* str);          // print debug title string
-    static void debugItem(const char* format, ...);   // print debug item string
-    static void debugCur(const char* format, ...);    // print debug cur string
-    static void notifyInfo(const char* format, ...);  // printt debug normal info
+    static void debugTitle(const char* str);         // print debug title string
+    static void debugItem(const char* format, ...);  // print debug item string
+    static void debugCur(const char* format, ...);   // print debug cur string
+    static void notifyInfo(const char* format, ...); // printt debug normal info
     static void notifyError(const char* format, ...); // print debug errror info
-    static void startTimer(const char*);              // start timer and print info
-    static void endTimer();                           // end timer and print info
+    static void startTimer(const char*); // start timer and print info
+    static void endTimer();              // end timer and print info
 };
 
 /** Redundance check. **/

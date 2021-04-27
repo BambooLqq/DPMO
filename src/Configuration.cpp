@@ -186,7 +186,8 @@ std::string Configuration::getServerIP()
 
 bool Configuration::addClient(uint16_t nodeid, std::string client_ip)
 {
-    if (id2ip_.find(nodeid) != id2ip_.end() && ip2id_.find(client_ip) != ip2id_.end())
+    if (id2ip_.find(nodeid) != id2ip_.end()
+        && ip2id_.find(client_ip) != ip2id_.end())
     {
         client_count_++;
         id2ip_.insert(std::pair<uint16_t, std::string>(nodeid, client_ip));
