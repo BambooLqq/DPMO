@@ -33,13 +33,13 @@ Client::Client(int sock_port, std::string config_file_path,
     {
         Debug::notifyError("Client connects server failed");
     }
-    Listen();
+    // Listen();
 }
 
 Client::~Client()
 {
-    is_running_ = false;
     Debug::notifyInfo("Stop RPCClient.");
+    is_running_ = false;
     if (conf_)
     {
         delete conf_;
@@ -183,6 +183,46 @@ void Client::Listen()
     Accept(sock_);
 }
 
+bool Client::SendCreatePool(uint64_t pool_id, uint64_t virtual_address)
+{
+    CreatePool send;
+    ibv_wc wc[1];
+    send.node_id = my_node_id_;
+    send.pool_id_ = pool_id;
+    send.type_ = CREATEPOOL;
+    send.virtual_addr_ = virtual_address;
+    void* send_base = (void*)(peers[0]->my_buf_addr_);
+    memcpy(send_base, &send, sizeof(CreatePool));
+    rdmasocket_->RdmaSend(peers[0]->qp[0], (uint64_t)send_base,
+                          sizeof(CreatePool));
+    if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+    {
+        void* recv_base = (void*)((uint64_t)send_base + FOURMB);
+        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        {
+            Response* response = (Response*)recv_base;
+            if (response->op_ret_ == SUCCESS)
+            {
+                Debug::notifyInfo("Server response: CreatePool Success!");
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        return false;
+    }
+}
+
 bool Client::SendMessageToServer()
 {
     char buf[128];
@@ -197,4 +237,5 @@ bool Client::SendMessageToServer()
     {
         std::cout << "Send Success";
     }
+    return true;
 }

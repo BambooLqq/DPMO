@@ -79,12 +79,4 @@ public:
     }
 };
 
-typedef enum
-{
-    NEWPOOL,
-    GETPOOL,
-    DELETEPOOL,
-
-} Message;
-
 #endif // !_GLOBAL_H

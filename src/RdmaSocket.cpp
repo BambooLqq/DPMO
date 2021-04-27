@@ -288,6 +288,7 @@ bool RdmaSocket::DestroySource()
         if (ibv_dealloc_pd(pd_))
         {
             Debug::notifyError("Failed to deallocate PD");
+            printf("%s\n", strerror(errno));
             rc = false;
         }
     }
@@ -854,7 +855,7 @@ bool RdmaSocket::OutboundHamal(PeerConnection* peer, uint64_t buffer_send,
         return false;
     }
     uint64_t send_packet_size = ONEMB;
-    uint64_t sendaddr = buf_addr_ + FOURKB + worker_id * ONEMB;
+    uint64_t sendaddr = peer->my_buf_addr_ + worker_id * ONEMB;
     uint64_t total_size = 0;
     uint64_t send_size;
 
@@ -887,7 +888,7 @@ bool RdmaSocket::RemoteWrite(PeerConnection* peer, uint64_t buffer_send,
     }
     uint64_t ship_size = 0;
 
-    if (size < FOURMB)
+    if (size < ONEMB)
     {
         OutboundHamal(peer, buffer_send, recv_offset, size, 0);
         return true;
@@ -961,7 +962,7 @@ bool RdmaSocket::InboundHamal(PeerConnection* peer, uint64_t buffer_recv,
         return false;
     }
     uint64_t read_packet_size = ONEMB;
-    uint64_t read_addr = buf_addr_ + FOURKB + worker_id * ONEMB;
+    uint64_t read_addr = buf_addr_ + worker_id * ONEMB;
     uint64_t total_read_size = 0, read_size;
 
     struct ibv_wc wc;
@@ -991,7 +992,7 @@ bool RdmaSocket::RemoteRead(PeerConnection* peer, uint64_t buffer_recv,
         return false;
     }
     int ship_size;
-    if (size < FOURMB)
+    if (size < ONEMB)
     {
         InboundHamal(peer, buffer_recv, des_offset, size, 0);
         return true;

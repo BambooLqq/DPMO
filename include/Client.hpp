@@ -3,7 +3,7 @@
 
 #include "RdmaSocket.hpp"
 #include "stdlib.h"
-
+#include "Message.hpp"
 // for client's mem
 // 为每个连接分配4KB的缓冲区
 // ***********************************************************************************************
@@ -94,6 +94,8 @@ public:
     ~Client();
 
     bool ConnectClient(uint16_t node_id); //连接其他Client
+
+    bool SendCreatePool(uint64_t pool_id, uint64_t virtual_address);
 
     bool SendMessageToServer();
 };

@@ -106,6 +106,7 @@ int main(int argc, char** argv)
     signal(SIGINT, Stop);
     server = new Server(config.sock_port_, config.config_file_, config.ib_dev_,
                         config.ib_port_);
+    delete server;
     // while (true)
     // {
     //     getchar();

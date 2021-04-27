@@ -2,6 +2,7 @@
 #define _SERVER_H
 
 #include "RdmaSocket.hpp"
+#include "Message.hpp"
 
 /* 
     // ***********************************************************************************************
@@ -72,6 +73,8 @@ class Server
     void ProcessRequest(PeerConnection* peer); // 处理与Nodeid连接的请求
 
     PeerConnection* GetPeerConnection(uint16_t nodeid);
+
+    bool ProcessRecv(uint16_t node_id);
 
 public:
     Server(int sock_port = 0, std::string config_file_path = "",

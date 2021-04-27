@@ -27,16 +27,13 @@ Server::Server(int sock_port, std::string config_file_path,
 Server::~Server()
 {
     Debug::notifyInfo("Stop RPCServer.");
+    is_running_ = false;
     if (conf_)
     {
         delete conf_;
         conf_ = NULL;
     }
-    if (rdmasocket_)
-    {
-        delete rdmasocket_;
-        rdmasocket_ = NULL;
-    }
+
     if ((void*)addr_)
     {
         free((void*)addr_);
@@ -55,13 +52,21 @@ Server::~Server()
         delete itr->second;
         itr->second = NULL;
     }
+    peers.clear();
 
     for (auto itr = poll_request.begin(); itr != poll_request.end(); itr++)
     {
         itr->second->join();
     }
+
     poll_request.clear();
-    peers.clear();
+
+    if (rdmasocket_)
+    {
+        delete rdmasocket_;
+        rdmasocket_ = NULL;
+    }
+
     Debug::notifyInfo("RPCServer is closed successfully.");
 }
 
@@ -142,8 +147,8 @@ void Server::Accecpt(int sock)
             // 接收recv请求
             for (int i = 0; i < QPS_MAX_DEPTH; i++)
             {
-                rdmasocket_->RdmaRecv(
-                    peer->qp[0], GetClientRecvBaseAddr(peer->node_id), FOURMB);
+                rdmasocket_->RdmaRecv(peer->qp[0], peer->my_buf_addr_ + FOURMB,
+                                      FOURMB);
             }
             std::thread* poll_cq_
                 = new std::thread(&Server::ProcessRequest, this, peer);
@@ -182,6 +187,7 @@ void Server::ProcessRequest(PeerConnection* peer) //
     }
     while (is_running_)
     {
+        Debug::notifyInfo("IS_RUNNING");
         struct ibv_wc wc[1];
         int ret = 0;
         if ((ret = rdmasocket_->PollCompletion(peer->cq, 1, wc)) <= 0)
@@ -193,12 +199,17 @@ void Server::ProcessRequest(PeerConnection* peer) //
             switch (wc->opcode) // 对于server 应该只有send recv
             {
             case IBV_WC_RECV:
-                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id)
-                          << std::endl;
-                break;
+                // std::cout << (char*)GetClientRecvBaseAddr(peer->node_id)
+                //           << std::endl;
+
+                // break;
             case IBV_WC_RECV_RDMA_WITH_IMM:
+                //debug
                 std::cout << (char*)GetClientRecvBaseAddr(peer->node_id)
                           << std::endl;
+                Debug::notifyInfo("Peer->node_id is %d, Recv node id is %d",
+                                  peer->node_id, wc->imm_data);
+                ProcessRecv(peer->node_id);
                 break;
             case IBV_WC_SEND: break;
             case IBV_WC_RDMA_WRITE: break;
@@ -206,6 +217,45 @@ void Server::ProcessRequest(PeerConnection* peer) //
             default: break;
             }
         }
-        return;
     }
+}
+
+bool Server::ProcessRecv(uint16_t node_id)
+{
+    PeerConnection* peer = peers[node_id];
+    ibv_wc wc[1];
+    if (peer)
+    {
+        Debug::notifyInfo("ProcessRecv: Recv Message From Node %d", node_id);
+        printf("my recv's address is %p\n",
+               (void*)(peer->my_buf_addr_ + FOURMB));
+        Request* recv = (Request*)(peer->my_buf_addr_ + FOURMB);
+        if (recv->type_ == CREATEPOOL)
+        {
+            CreatePool create_pool_req
+                = *(CreatePool*)(peer->my_buf_addr_ + FOURMB);
+            Debug::notifyInfo(
+                "Client %d request add a pool: poolid %d, virtual address: %p",
+                node_id, create_pool_req.pool_id_,
+                create_pool_req.virtual_addr_);
+            if (AddPool(create_pool_req.pool_id_, create_pool_req.node_id,
+                        create_pool_req.virtual_addr_))
+            {
+                Debug::notifyInfo("Create Pool Success");
+                Response response;
+                response.op_ret_ = SUCCESS;
+                uint64_t send_base = peer->my_buf_addr_;
+                memcpy((void*)send_base, &response, sizeof(Response));
+                rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                                      sizeof(Response));
+                if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    Debug::notifyError("ProcessRecv: Peers[node_id] is NULL");
+    return false;
 }

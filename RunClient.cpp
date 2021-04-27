@@ -109,6 +109,8 @@ int main(int argc, char** argv)
     client = new Client(config.sock_port_, config.config_file_, config.ib_dev_,
                         config.ib_port_);
     client->SendMessageToServer();
+    client->SendCreatePool(1234, 0x5678abcd);
+    delete client;
     // while (true)
     // {
     //     getchar();
