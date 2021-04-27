@@ -67,38 +67,49 @@ Server::~Server()
 
 bool Server::AddPool(uint32_t pool_id, uint16_t node_id, uint64_t va)
 {
+    std::unique_lock<std::mutex> mlock(m);
     if (pool_info_.find(pool_id) != pool_info_.end())
     {
         Debug::notifyError("The Pool %d had been created by node %d ,VA :%lld",
                            pool_id, pool_info_.find(pool_id)->second->node_id_,
                            pool_id,
                            pool_info_.find(pool_id)->second->virtual_address_);
+        mlock.unlock();
+        cond.notify_one();
         return false;
     }
 
     PoolInfo* new_pool = new PoolInfo(node_id, va);
     pool_info_.insert(PoolPair(pool_id, new_pool));
+    mlock.unlock();
+    cond.notify_one();
     return true;
 }
 
 PoolInfo* Server::GetPool(uint32_t pool_id)
 {
+    std::unique_lock<std::mutex> mlock(m);
     if (pool_info_.find(pool_id) != pool_info_.end())
     {
         return pool_info_.find(pool_id)->second;
     }
     Debug::notifyError("Don't exist the pool %d", pool_id);
+    mlock.unlock();
+    cond.notify_one();
     return NULL;
 }
 
 bool Server::DeletePool(uint32_t pool_id)
 {
+    std::unique_lock<std::mutex> mlock(m);
     if (pool_info_.find(pool_id) != pool_info_.end())
     {
         pool_info_.erase(pool_id);
         return true;
     }
     Debug::notifyError("Don't exist the pool %d", pool_id);
+    mlock.unlock();
+    cond.notify_one();
     return false;
 }
 

@@ -46,6 +46,9 @@ class Server
     ID2POOL pool_info_;
     bool is_running_;
 
+    std::mutex m;                 //保护pool_info
+    std::condition_variable cond; //条件
+
     bool AddPool(uint32_t pool_id, uint16_t node_id, uint64_t va);
 
     bool DeletePool(uint32_t pool_id);
@@ -60,6 +63,15 @@ class Server
         }
         return true;
     }
+
+    void Listen();
+    void Accecpt(int sock);
+
+    void RdmaQueryQueuePair(uint16_t node_id);
+
+    void ProcessRequest(PeerConnection* peer); // 处理与Nodeid连接的请求
+
+    PeerConnection* GetPeerConnection(uint16_t nodeid);
 
 public:
     Server(int sock_port = 0, std::string config_file_path = "",
@@ -92,15 +104,6 @@ public:
         }
         return peers[node_id]->peer_buf_addr_;
     }
-
-    void Listen();
-    void Accecpt(int sock);
-
-    void RdmaQueryQueuePair(uint16_t node_id);
-
-    void ProcessRequest(PeerConnection* peer); // 处理与Nodeid连接的请求
-
-    PeerConnection* GetPeerConnection(uint16_t nodeid);
 };
 
 #endif // !_SeERVER_h

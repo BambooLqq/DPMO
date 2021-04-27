@@ -19,3 +19,11 @@ an RDMA-enabled distributed Persistent Memory Object System
 
 3. RDMASocket仍然存在一些问题 需要进行优化
 
+4. 使用多线程或者线程池对请求进行处理 
+- 目前使用多线程，后续优化为线程池
+
+### 备注
+1. 连接双方通信包括
+- Send/Recv 消息机制 可以用来传输请求
+- Read/Recv 内存读写 用来传输数据
+
