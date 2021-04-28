@@ -110,6 +110,35 @@ int main(int argc, char** argv)
                         config.ib_port_);
     client->SendMessageToServer();
     client->SendCreatePool(1234, 0x5678abcd);
+    client->SendCreatePool(1234, 0x5678abcd);
+    client->SendDeletePool(1245);
+    client->SendDeletePool(1234);
+    client->SendCreatePool(1234, 0xabcdef12);
+    GetRemotePool result;
+    if (client->SendFindPool(1234, &result))
+    {
+        std::cout << "result: ip is : " << result.ip_ << std::endl;
+        std::cout << "result: node id is : " << result.node_id_ << std::endl;
+        std::cout << "result: va is : " << std::hex << result.virtual_address_
+                  << std::oct << std::endl;
+    }
+    else
+    {
+        std::cout << "Not Found Poolid " << 1234 << std::endl;
+    }
+
+    if (client->SendFindPool(2345, &result))
+    {
+        std::cout << "result: ip is : " << result.ip_ << std::endl;
+        std::cout << "result: node id is : " << result.node_id_ << std::endl;
+        std::cout << "result: va is : 0x" << std::hex << result.virtual_address_
+                  << std::oct << std::endl;
+    }
+    else
+    {
+        std::cout << "Not Found Poolid " << 2345 << std::endl;
+    }
+
     delete client;
     // while (true)
     // {

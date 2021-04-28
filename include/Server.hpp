@@ -13,25 +13,6 @@
 
 // 多线程 轮询每个连接的CQ 从而进行相应的处理
 
-class PoolInfo
-{
-public:
-    uint32_t node_id_;
-    uint64_t virtual_address_;
-    PoolInfo(uint32_t node_id, uint64_t virtual_address)
-        : node_id_(node_id), virtual_address_(virtual_address)
-    {
-    }
-};
-
-typedef struct NodeInfo
-{
-    uint16_t node_id_;
-    std::string ip_;
-} NodeInfo;
-
-typedef std::unordered_map<uint32_t, PoolInfo*> ID2POOL;
-typedef std::pair<uint32_t, PoolInfo*> PoolPair;
 
 class Server
 {
@@ -50,11 +31,11 @@ class Server
     std::mutex m;                 //保护pool_info
     std::condition_variable cond; //条件
 
-    bool AddPool(uint32_t pool_id, uint16_t node_id, uint64_t va);
+    bool AddPool(uint64_t pool_id, uint16_t node_id, uint64_t va);
 
-    bool DeletePool(uint32_t pool_id);
+    bool DeletePool(uint64_t pool_id);
 
-    PoolInfo* GetPool(uint32_t pool_id);
+    PoolInfo* GetPool(uint64_t pool_id);
 
     bool IsConnected(uint16_t node_id)
     {

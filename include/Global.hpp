@@ -79,4 +79,31 @@ public:
     }
 };
 
+class PoolInfo
+{
+public:
+    uint32_t node_id_;
+    uint64_t virtual_address_;
+    PoolInfo(uint32_t node_id, uint64_t virtual_address)
+        : node_id_(node_id), virtual_address_(virtual_address)
+    {
+    }
+};
+
+typedef struct NodeInfo
+{
+    uint16_t node_id_;
+    char ip_[20];
+} NodeInfo;
+
+typedef struct GetRemotePool
+{
+    uint16_t node_id_;
+    char ip_[20];
+    uint64_t virtual_address_;
+} GetRemotePool;
+
+typedef std::unordered_map<uint32_t, PoolInfo*> ID2POOL;
+typedef std::pair<uint32_t, PoolInfo*> PoolPair;
+
 #endif // !_GLOBAL_H

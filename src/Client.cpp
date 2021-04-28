@@ -209,16 +209,110 @@ bool Client::SendCreatePool(uint64_t pool_id, uint64_t virtual_address)
             }
             else
             {
+                Debug::notifyError("Server response: CreatePool Failed!");
                 return false;
             }
         }
         else
         {
+            Debug::notifyError("Not recv the server's response");
             return false;
         }
     }
     else
     {
+        Debug::notifyError("Client send the request failed");
+        return false;
+    }
+}
+
+bool Client::SendDeletePool(uint64_t pool_id)
+{
+    DeletePool send;
+    ibv_wc wc[1];
+    send.pool_id_ = pool_id;
+    send.type_ = DELETEPOOL;
+    void* send_base = (void*)(peers[0]->my_buf_addr_);
+    memcpy(send_base, &send, sizeof(DeletePool));
+    rdmasocket_->RdmaSend(peers[0]->qp[0], (uint64_t)send_base,
+                          sizeof(DeletePool));
+    if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+    {
+        void* recv_base = (void*)((uint64_t)send_base + FOURMB);
+        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        {
+            Response* response = (Response*)recv_base;
+            if (response->op_ret_ == SUCCESS)
+            {
+                Debug::notifyInfo("Server response: DeletePool Success!");
+                return true;
+            }
+            else
+            {
+                Debug::notifyError("Server response: DeletePool Failed!");
+                return false;
+            }
+        }
+        else
+        {
+            Debug::notifyError("Not recv the server's response");
+            return false;
+        }
+    }
+    else
+    {
+        Debug::notifyError("Client send the request failed");
+        return false;
+    }
+}
+
+bool Client::SendFindPool(uint64_t pool_id, GetRemotePool* result)
+{
+    FindPool send;
+    ibv_wc wc[1];
+    send.pool_id_ = pool_id;
+    send.type_ = FINDPOOL;
+    void* send_base = (void*)(peers[0]->my_buf_addr_);
+    memcpy(send_base, &send, sizeof(FindPool));
+    rdmasocket_->RdmaSend(peers[0]->qp[0], (uint64_t)send_base,
+                          sizeof(FindPool));
+    if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+    {
+        void* recv_base = (void*)((uint64_t)send_base + FOURMB);
+        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        {
+            Response* response = (Response*)recv_base;
+            if (response->op_ret_ == INFO)
+            {
+                Debug::notifyInfo("Server response: FindPool Success!");
+                response = (FindResponse*)recv_base;
+                result->node_id_ = ((FindResponse*)response)->node_id_;
+                result->virtual_address_
+                    = ((FindResponse*)response)->virtual_addr_;
+                memcpy(result->ip_, ((FindResponse*)response)->ip_,
+                       sizeof(FindResponse::ip_));
+                Debug::notifyInfo("Pool %ld is in node %d, VA: %p, ip :%s",
+                                  pool_id, result->node_id_,
+                                  result->virtual_address_, result->ip_);
+                return true;
+            }
+            else
+            {
+                Debug::notifyError("Server response: FindPool Failed!");
+                return false;
+            }
+        }
+        else
+        {
+            Debug::notifyError("Not recv the server's response");
+            return false;
+        }
+    }
+    else
+    {
+        Debug::notifyError("Client send the request failed");
         return false;
     }
 }

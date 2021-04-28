@@ -70,12 +70,12 @@ Server::~Server()
     Debug::notifyInfo("RPCServer is closed successfully.");
 }
 
-bool Server::AddPool(uint32_t pool_id, uint16_t node_id, uint64_t va)
+bool Server::AddPool(uint64_t pool_id, uint16_t node_id, uint64_t va)
 {
     std::unique_lock<std::mutex> mlock(m);
     if (pool_info_.find(pool_id) != pool_info_.end())
     {
-        Debug::notifyError("The Pool %d had been created by node %d ,VA :%lld",
+        Debug::notifyError("The Pool %ld had been created by node %d ,VA :%lld",
                            pool_id, pool_info_.find(pool_id)->second->node_id_,
                            pool_id,
                            pool_info_.find(pool_id)->second->virtual_address_);
@@ -91,11 +91,14 @@ bool Server::AddPool(uint32_t pool_id, uint16_t node_id, uint64_t va)
     return true;
 }
 
-PoolInfo* Server::GetPool(uint32_t pool_id)
+PoolInfo* Server::GetPool(uint64_t pool_id)
 {
     std::unique_lock<std::mutex> mlock(m);
-    if (pool_info_.find(pool_id) != pool_info_.end())
+    ID2POOL::iterator itr = pool_info_.find(pool_id);
+    if (itr != pool_info_.end())
     {
+        Debug::notifyInfo("Find the pool %ld in node %d, va: %p", pool_id,
+                          itr->second->node_id_, itr->second->virtual_address_);
         return pool_info_.find(pool_id)->second;
     }
     Debug::notifyError("Don't exist the pool %d", pool_id);
@@ -104,11 +107,15 @@ PoolInfo* Server::GetPool(uint32_t pool_id)
     return NULL;
 }
 
-bool Server::DeletePool(uint32_t pool_id)
+bool Server::DeletePool(uint64_t pool_id)
 {
     std::unique_lock<std::mutex> mlock(m);
-    if (pool_info_.find(pool_id) != pool_info_.end())
+    ID2POOL::iterator itr = pool_info_.find(pool_id);
+    if (itr != pool_info_.end())
     {
+        Debug::notifyInfo(
+            "DeletePool: find the pool %ld, VA: %p, node_id is %d", pool_id,
+            itr->second->virtual_address_, itr->second->node_id_);
         pool_info_.erase(pool_id);
         return true;
     }
@@ -196,6 +203,7 @@ void Server::ProcessRequest(PeerConnection* peer) //
         }
         else
         {
+            Debug::notifyInfo("wc->op_code is %d", wc->opcode);
             switch (wc->opcode) // 对于server 应该只有send recv
             {
             case IBV_WC_RECV:
@@ -244,6 +252,107 @@ bool Server::ProcessRecv(uint16_t node_id)
                 Debug::notifyInfo("Create Pool Success");
                 Response response;
                 response.op_ret_ = SUCCESS;
+                uint64_t send_base = peer->my_buf_addr_;
+                memcpy((void*)send_base, &response, sizeof(Response));
+                rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                                      sizeof(Response));
+                if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                Debug::notifyInfo("Create Pool Failed");
+                Response response;
+                response.op_ret_ = FAIL;
+                uint64_t send_base = peer->my_buf_addr_;
+                memcpy((void*)send_base, &response, sizeof(Response));
+                rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                                      sizeof(Response));
+                if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+                {
+                    return true;
+                }
+            }
+        }
+        else if (recv->type_ == DELETEPOOL)
+        {
+            struct DeletePool delete_pool_cq
+                = *(struct DeletePool*)(peer->my_buf_addr_ + FOURMB);
+            Debug::notifyInfo("Client %d request delete a pool: poolid %d",
+                              node_id, delete_pool_cq.pool_id_);
+            if (DeletePool(delete_pool_cq.pool_id_))
+            {
+                Debug::notifyInfo("Delete Pool Success");
+                Response response;
+                response.op_ret_ = SUCCESS;
+                uint64_t send_base = peer->my_buf_addr_;
+                memcpy((void*)send_base, &response, sizeof(Response));
+                rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                                      sizeof(Response));
+                if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+                {
+                    Debug::notifyInfo("Reponse Delete Pool Success");
+                    return true;
+                }
+                else
+                {
+                    Debug::notifyInfo("Reponse Delete Pool Failed");
+                    return false;
+                }
+            }
+            else
+            {
+                Debug::notifyInfo("Delete Pool Failed");
+                Response response;
+                response.op_ret_ = FAIL;
+                uint64_t send_base = peer->my_buf_addr_;
+                memcpy((void*)send_base, &response, sizeof(Response));
+                rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                                      sizeof(Response));
+                if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+                {
+                    return true;
+                }
+            }
+        }
+        else if (recv->type_ == FINDPOOL)
+        {
+            FindPool find_pool_cq
+                = *(struct FindPool*)(peer->my_buf_addr_ + FOURMB);
+            Debug::notifyInfo("Client %d request find a pool: poolid %d",
+                              node_id, find_pool_cq.pool_id_);
+
+            if (PoolInfo* ret = GetPool(find_pool_cq.pool_id_))
+            {
+                Debug::notifyInfo("Find Pool Success");
+                FindResponse response;
+                response.op_ret_ = INFO;
+                response.node_id_ = ret->node_id_;
+                response.virtual_addr_ = ret->virtual_address_;
+                memcpy(response.ip_, peers[ret->node_id_]->peer_ip,
+                       sizeof(peers[0]->peer_ip));
+                uint64_t send_base = peer->my_buf_addr_;
+                memcpy((void*)send_base, &response, sizeof(FindResponse));
+                rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                                      sizeof(FindResponse));
+                if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+                {
+                    Debug::notifyInfo("Reponse Find Pool Success");
+                    return true;
+                }
+                else
+                {
+                    Debug::notifyInfo("Reponse Find Pool Failed");
+                    return false;
+                }
+            }
+            else
+            {
+                Debug::notifyInfo("Find Pool Failed");
+                Response response;
+                response.op_ret_ = FAIL;
                 uint64_t send_base = peer->my_buf_addr_;
                 memcpy((void*)send_base, &response, sizeof(Response));
                 rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,

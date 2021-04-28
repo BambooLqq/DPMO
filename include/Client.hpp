@@ -97,6 +97,10 @@ public:
 
     bool SendCreatePool(uint64_t pool_id, uint64_t virtual_address);
 
+    bool SendDeletePool(uint64_t pool_id);
+
+    bool SendFindPool(uint64_t pool_id, GetRemotePool* result);
+
     bool SendMessageToServer();
 };
 
