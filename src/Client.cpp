@@ -368,7 +368,7 @@ void Client::ProcessRequest(PeerConnection* peer)
                 //debug
                 Debug::notifyInfo("Peer->node_id is %d, Recv node id is %d",
                                   peer->node_id, wc->imm_data);
-                // ProcessRecv(peer->node_id);
+                ProcessRecv(peer);
                 break;
             case IBV_WC_SEND: break;
             case IBV_WC_RDMA_WRITE: break;
@@ -376,6 +376,107 @@ void Client::ProcessRequest(PeerConnection* peer)
             default: break;
             }
         }
+    }
+}
+
+void Client::ProcessRecv(PeerConnection* peer)
+{
+    void* recv_base = (void*)(peer->my_buf_addr_ + FOURMB);
+    Request* recv = (Request*)recv_base;
+    if (recv->type_ == GETPOOLDATA)
+    {
+        GetPoolData get_pool_data = *(GetPoolData*)recv_base;
+        Debug::notifyInfo(
+            "Client %d request a pool data, va: %p, offset: %llu,size: %llu",
+            peer->node_id, get_pool_data.virtual_address_,
+            get_pool_data.offset_, get_pool_data.size_);
+        void* send_base = (void*)peer->my_buf_addr_;
+        memset(send_base, 0, FOURMB);
+        char temp[64];
+        sprintf(
+            temp, "%p",
+            (void*)(get_pool_data.virtual_address_ + get_pool_data.offset_));
+        memcpy(send_base, temp, sizeof(temp));
+        void* send = (void*)((uint64_t)send_base + sizeof(temp));
+        memcpy(send,
+               (void*)(get_pool_data.virtual_address_ + get_pool_data.offset_),
+               get_pool_data.size_);
+        rdmasocket_->RemoteWrite(peer, (uint64_t)send_base, 0,
+                                 sizeof(temp) + get_pool_data.size_);
+    }
+}
+
+bool Client::SendGetPoolData(uint16_t node_id, uint64_t virtual_address,
+                             uint64_t offset, size_t size, void* result)
+{
+    GetPoolData send;
+    ibv_wc wc[1];
+    send.virtual_address_ = virtual_address;
+    send.offset_ = offset;
+    send.size_ = size;
+    send.type_ = GETPOOLDATA;
+    PeerConnection* peer = peers[node_id];
+
+    void* send_base = (void*)(peer->my_buf_addr_);
+    void* recv_base = (void*)((uint64_t)send_base + FOURMB);
+    memset(recv_base, 0, FOURMB);
+    memcpy(send_base, &send, sizeof(GetPoolData));
+    rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                          sizeof(GetPoolData));
+    if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+    {
+        char temp[64];
+        memset(temp, 0, sizeof(temp));
+        sprintf(temp, "%p", (void*)(virtual_address + offset));
+        while (memcmp(recv_base, temp, sizeof(temp)))
+            ; //直到收到数据
+        memcpy(result, (void*)((uint64_t)recv_base + sizeof(temp)),
+               size); //将数据复制到结果
+        return true;
+    }
+    else
+    {
+        Debug::notifyError("Client send the request failed");
+        return false;
+    }
+}
+
+bool Client::GetRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
+                               void* result)
+{
+    GetRemotePool remote_pool_info;
+    if (SendFindPool(pool_id, &remote_pool_info))
+    {
+        if (ConnectClient(remote_pool_info.node_id_))
+        {
+            if (SendGetPoolData(remote_pool_info.node_id_,
+                                remote_pool_info.virtual_address_, offset, size,
+                                result))
+            {
+                return true;
+            }
+            else
+            {
+                Debug::notifyError("GetRemotePoolData: SendGetPoolData \
+                    Failed: node_id:%d, va: %p, offset: %llu, size: %llu",
+                                   remote_pool_info.node_id_,
+                                   remote_pool_info.virtual_address_, offset,
+                                   size);
+                return false;
+            }
+        }
+        else
+        {
+            Debug::notifyError("GetRemotePoolData: Connect Client %d: Failed",
+                               remote_pool_info.node_id_);
+            return false;
+        }
+    }
+    else
+    {
+        Debug::notifyError(
+            "GetRemotePoolData: poolid: %llu,SendFindPool Failed", pool_id);
+        return false;
     }
 }
 

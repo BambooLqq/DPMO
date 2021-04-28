@@ -92,7 +92,7 @@ class Client
 
     void ProcessRequest(PeerConnection* peer); // 处理与Nodeid连接的请求
 
-    // bool ProcessRecv(uint16_t node_id);
+    void ProcessRecv(PeerConnection* peer);
 
 public:
     Client(int sock_port = 0, std::string config_file_path = "",
@@ -106,6 +106,12 @@ public:
     bool SendDeletePool(uint64_t pool_id);
 
     bool SendFindPool(uint64_t pool_id, GetRemotePool* result);
+
+    bool SendGetPoolData(uint16_t node_id, uint64_t virtual_address,
+                         uint64_t offset, size_t size, void* result);
+
+    bool GetRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
+                           void* result);
 
     bool SendMessageToServer();
 };

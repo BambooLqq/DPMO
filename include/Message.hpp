@@ -8,6 +8,7 @@ typedef enum
     CREATEPOOL,
     FINDPOOL,
     DELETEPOOL,
+    GETPOOLDATA,
 } Message;
 
 typedef enum
@@ -38,6 +39,12 @@ struct DeletePool : Request
     uint64_t pool_id_;
 };
 
+struct GetPoolData : Request
+{
+    uint64_t virtual_address_;
+    uint64_t offset_;
+    size_t size_;
+};
 struct Response
 {
     Status op_ret_;

@@ -109,50 +109,49 @@ int main(int argc, char** argv)
     client = new Client(config.sock_port_, config.config_file_, config.ib_dev_,
                         config.ib_port_);
     client->SendMessageToServer();
-
-    void* buf = malloc(1024);
-    memset(buf, 0, 1024);
-    if (buf == NULL)
-    {
-        std::cout << "malloc failed" << std::endl;
-    }
-    else
-    {
-        printf("buf: %p\n", buf);
-    }
-    const char* source = "I am Client 1";
-
-    memcpy(buf, "   I am Client 1", sizeof(source));
-    client->SendCreatePool(1234, 0x1234abcd);
+    client->SendCreatePool(1234, 0x5678abcd);
     client->SendCreatePool(1234, 0x5678abcd);
     client->SendDeletePool(1245);
-    client->SendDeletePool(1234);
-    client->SendCreatePool(1234, (uint64_t)buf);
+    // client->SendDeletePool(1234);
+    // client->SendCreatePool(1234, 0xabcdef12);
     GetRemotePool result;
-    if (client->SendFindPool(1234, &result))
+    // if (client->SendFindPool(1234, &result))
+    // {
+    //     std::cout << "result: ip is : " << result.ip_ << std::endl;
+    //     std::cout << "result: node id is : " << result.node_id_ << std::endl;
+    //     std::cout << "result: va is : " << std::hex << result.virtual_address_
+    //               << std::dec << std::endl;
+    // }
+    // else
+    // {
+    //     std::cout << "Not Found Poolid " << 1234 << std::endl;
+    // }
+
+    // if (client->SendFindPool(2345, &result))
+    // {
+    //     std::cout << "result: ip is : " << result.ip_ << std::endl;
+    //     std::cout << "result: node id is : " << result.node_id_ << std::endl;
+    //     std::cout << "result: va is : 0x" << std::hex << result.virtual_address_
+    //               << std::dec << std::endl;
+    // }
+    // else
+    // {
+    //     std::cout << "Not Found Poolid " << 2345 << std::endl;
+    // }
+
+    void* res = malloc(1024);
+    if (res == NULL)
     {
-        std::cout << "result: ip is : " << result.ip_ << std::endl;
-        std::cout << "result: node id is : " << result.node_id_ << std::endl;
-        std::cout << "result: va is : " << std::hex << result.virtual_address_
-                  << std::dec << std::endl;
+        std::cout << "result malloc failed" << std::endl;
     }
     else
     {
-        std::cout << "Not Found Poolid " << 1234 << std::endl;
+        memset(res, 0, 1024);
+        printf("res: %p", res);
     }
 
-    if (client->SendFindPool(2345, &result))
-    {
-        std::cout << "result: ip is : " << result.ip_ << std::endl;
-        std::cout << "result: node id is : " << result.node_id_ << std::endl;
-        std::cout << "result: va is : 0x" << std::hex << result.virtual_address_
-                  << std::dec << std::endl;
-    }
-    else
-    {
-        std::cout << "Not Found Poolid " << 2345 << std::endl;
-    }
-
+    client->GetRemotePoolData(1234, 3, 13, res);
+    std::cout << "res: " << res << std::endl;
     while (1)
     {
     }
