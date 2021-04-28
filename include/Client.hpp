@@ -25,6 +25,8 @@ class Client
 
     bool is_running_;
 
+    std::thread listener_;
+
     bool IsConnected(uint16_t node_id)
     {
         if (peers.find(node_id) == peers.end())
@@ -87,6 +89,10 @@ class Client
     bool ConnectServer();
 
     PeerConnection* GetPeerConnection(uint16_t nodeid);
+
+    void ProcessRequest(PeerConnection* peer); // 处理与Nodeid连接的请求
+
+    // bool ProcessRecv(uint16_t node_id);
 
 public:
     Client(int sock_port = 0, std::string config_file_path = "",

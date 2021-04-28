@@ -448,6 +448,12 @@ int RdmaSocket::RdmaListen()
     memset(&my_address, 0, sizeof(sockaddr_in));
     my_address.sin_family = AF_INET;
     my_address.sin_addr.s_addr = INADDR_ANY;
+    // just for test
+    //只有两台机器 Server和Client不监听同一端口
+    if (!is_server_)
+    {
+        sock_port_ += 1;
+    }
     my_address.sin_port = htons(sock_port_);
 
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)

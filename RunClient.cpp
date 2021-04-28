@@ -138,8 +138,11 @@ int main(int argc, char** argv)
     {
         std::cout << "Not Found Poolid " << 2345 << std::endl;
     }
+    while (1)
+    {
+    }
 
-    delete client;
+    // delete client;
     // while (true)
     // {
     //     getchar();
