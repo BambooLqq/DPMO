@@ -41,7 +41,7 @@ Client::~Client()
 {
     Debug::notifyInfo("Stop RPCClient.");
     is_running_ = false;
-    listener_.detach();
+    listener_.join();
     if (conf_)
     {
         delete conf_;
@@ -52,6 +52,7 @@ Client::~Client()
     {
         free((void*)addr_);
     }
+
     for (auto itr = peers.begin(); itr != peers.end(); itr++)
     {
         delete itr->second;
@@ -60,19 +61,25 @@ Client::~Client()
     peers.clear();
     Debug::notifyInfo("Peers Clear Successfully");
 
+    for (auto itr = poll_request_thread_.begin();
+         itr != poll_request_thread_.end(); itr++)
+    {
+        // itr->second->detach();
+        pthread_t tid = itr->second->native_handle();
+        std::cout << "poll_thread_id is: " << tid << std::endl;
+        pthread_kill(tid, SIGTERM);
+        itr->second->join();
+        delete itr->second;
+    }
+    poll_request_thread_.clear();
+    Debug::notifyInfo("poll_request_thread Clear Successfully");
+
+
     if (rdmasocket_)
     {
         delete rdmasocket_;
         rdmasocket_ = NULL;
     }
-    for (auto itr = poll_request_thread_.begin();
-         itr != poll_request_thread_.end(); itr++)
-    {
-        itr->second->detach();
-    }
-
-    poll_request_thread_.clear();
-    Debug::notifyInfo("poll_request_thread Clear Successfully");
 
     Debug::notifyInfo("Client is closed successfully.");
 }
@@ -352,6 +359,13 @@ bool Client::SendFindPool(uint64_t pool_id, GetRemotePool* result)
     }
 }
 
+void Client::SignalTerm(int sig)
+{
+    std::cout << "Client::ProcessRequest thread id is "
+              << std::this_thread::get_id() << std::endl;
+    pthread_exit(NULL);
+}
+
 void Client::ProcessRequest(PeerConnection* peer)
 {
     if (peer == NULL)
@@ -359,6 +373,7 @@ void Client::ProcessRequest(PeerConnection* peer)
         Debug::notifyError("ProcessRequest: peer is NULL");
         return;
     }
+    signal(SIGTERM, Client::SignalTerm);
     while (is_running_)
     {
         Debug::notifyInfo("Client Is Processing Request");
@@ -391,6 +406,7 @@ void Client::ProcessRequest(PeerConnection* peer)
             }
         }
     }
+    Debug::notifyInfo("Client: ProcessRequest node %d exit!", peer->node_id);
 }
 
 void Client::ProcessRecv(PeerConnection* peer)

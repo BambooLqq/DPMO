@@ -21,13 +21,14 @@ Server::Server(int sock_port, std::string config_file_path,
                                  device_name, rdma_port); // RC
     is_running_ = true;
 
-    Listen();
+    listener_ = std::thread(&Server::Listen, this);
 }
 
 Server::~Server()
 {
     Debug::notifyInfo("Stop RPCServer.");
     is_running_ = false;
+    listener_.join();
     if (conf_)
     {
         delete conf_;
@@ -47,19 +48,25 @@ Server::~Server()
         }
         pool_info_.clear();
     }
+    Debug::notifyInfo("Pool info clear successfully");
     for (auto itr = peers.begin(); itr != peers.end(); itr++)
     {
         delete itr->second;
         itr->second = NULL;
     }
     peers.clear();
+    Debug::notifyInfo("Peers info clear successfully");
 
     for (auto itr = poll_request.begin(); itr != poll_request.end(); itr++)
     {
+        pthread_t tid = itr->second->native_handle();
+        std::cout << "poll_thread_id is: " << tid << std::endl;
+        pthread_kill(tid, SIGTERM);
         itr->second->join();
+        delete itr->second;
     }
-
     poll_request.clear();
+    Debug::notifyInfo("Poll_request clear successfully");
 
     if (rdmasocket_)
     {
@@ -196,6 +203,13 @@ PeerConnection* Server::GetPeerConnection(uint16_t nodeid)
     }
 }
 
+void Server::SignalTerm(int sig)
+{
+    std::cout << "Server::ProcessRequest thread id is "
+              << std::this_thread::get_id() << std::endl;
+    pthread_exit(NULL);
+}
+
 void Server::ProcessRequest(PeerConnection* peer) //
 {
     if (peer == NULL)
@@ -203,6 +217,7 @@ void Server::ProcessRequest(PeerConnection* peer) //
         Debug::notifyError("ProcessRequest: peer is NULL");
         return;
     }
+    signal(SIGTERM, Server::SignalTerm);
     while (is_running_)
     {
         Debug::notifyInfo("IS_RUNNING");

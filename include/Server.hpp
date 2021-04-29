@@ -31,6 +31,8 @@ class Server
     std::mutex m;                 //保护pool_info
     std::condition_variable cond; //条件
 
+    std::thread listener_;
+
     bool AddPool(uint64_t pool_id, uint16_t node_id, uint64_t va);
 
     bool DeletePool(uint64_t pool_id);
@@ -56,6 +58,8 @@ class Server
     PeerConnection* GetPeerConnection(uint16_t nodeid);
 
     bool ProcessRecv(uint16_t node_id);
+    
+    static void SignalTerm(int sig);
 
 public:
     Server(int sock_port = 0, std::string config_file_path = "",

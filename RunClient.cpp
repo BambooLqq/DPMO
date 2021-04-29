@@ -152,12 +152,13 @@ int main(int argc, char** argv)
     {
         std::cout << "Not Found Poolid " << 2345 << std::endl;
     }
-
-    while (1)
+    int i = 0;
+    while (++i)
     {
+        usleep(1000000);
+        if (i == 10) break;
     }
-
-    // delete client;
+    delete client;
     // while (true)
     // {
     //     getchar();

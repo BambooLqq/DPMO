@@ -94,6 +94,8 @@ class Client
 
     void ProcessRecv(PeerConnection* peer);
 
+    static void SignalTerm(int sig);
+
 public:
     Client(int sock_port = 0, std::string config_file_path = "",
            std::string device_name = "", uint32_t rdma_port = 1);
