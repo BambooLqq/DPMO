@@ -131,10 +131,21 @@ void Server::Accecpt(int sock)
     int fd;
     // struct timespec start, end;
     socklen_t sin_size = sizeof(struct sockaddr_in);
+    struct timeval timeout = {3, 0};
+    int ret = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,
+                         sizeof(timeout));
+    if (ret < 0) Debug::notifyError("Set timeout failed!");
     while (is_running_
-           && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size))
-                  != -1)
+           && (fd = accept(sock, (struct sockaddr*)&remote_address, &sin_size)))
     {
+        if (fd == -1)
+        {
+            if (errno == EWOULDBLOCK)
+                continue;
+            else
+                break;
+        }
+
         Debug::notifyInfo("Accept a client");
         PeerConnection* peer = new PeerConnection();
         peer->sock = fd;
