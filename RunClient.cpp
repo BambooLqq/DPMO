@@ -120,9 +120,9 @@ int main(int argc, char** argv)
     {
         printf("buf: %p\n", buf);
     }
-    const char* source = "I am Client 1";
+    const char* source = "   I am Client 1";
 
-    memcpy(buf, "   I am Client 1", sizeof(source));
+    memcpy(buf, source, strlen(source));
     client->SendCreatePool(1234, 0x1234abcd);
     client->SendCreatePool(1234, 0x5678abcd);
     client->SendDeletePool(1245);

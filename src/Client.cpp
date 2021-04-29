@@ -393,6 +393,7 @@ void Client::ProcessRecv(PeerConnection* peer)
         void* send_base = (void*)peer->my_buf_addr_;
         memset(send_base, 0, FOURMB);
         char temp[64];
+        memset(temp, 0, sizeof(temp));
         sprintf(
             temp, "%p",
             (void*)(get_pool_data.virtual_address_ + get_pool_data.offset_));
@@ -401,6 +402,8 @@ void Client::ProcessRecv(PeerConnection* peer)
         memcpy(send,
                (void*)(get_pool_data.virtual_address_ + get_pool_data.offset_),
                get_pool_data.size_);
+        std::cout << "RemoteWrite: " << (char*)send_base << " " << (char*)send
+                  << std::endl;
         rdmasocket_->RemoteWrite(peer, (uint64_t)send_base, 0,
                                  sizeof(temp) + get_pool_data.size_);
     }
