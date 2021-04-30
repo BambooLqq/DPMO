@@ -432,10 +432,36 @@ void Client::ProcessRecv(PeerConnection* peer)
         memcpy(send,
                (void*)(get_pool_data.virtual_address_ + get_pool_data.offset_),
                get_pool_data.size_);
+        void* send_data_end = (void*)((uint64_t)send + get_pool_data.size_);
+        memcpy(send_data_end, temp, sizeof(temp));
         std::cout << "RemoteWrite: " << (char*)send_base << " " << (char*)send
-                  << std::endl;
+                  << " " << (char*)send_data_end << std::endl;
         rdmasocket_->RemoteWrite(peer, (uint64_t)send_base, 0,
-                                 sizeof(temp) + get_pool_data.size_);
+                                 2 * sizeof(temp) + get_pool_data.size_);
+    }
+    else if (recv->type_ == WRITEPOOLDATA)
+    {
+        WritePoolData write_pool_data = *(WritePoolData*)recv_base;
+        uint64_t va = write_pool_data.virtual_address_;
+        uint64_t offset = write_pool_data.offset_;
+        uint64_t size = write_pool_data.size_;
+
+        Debug::notifyInfo(
+            "Client %d request Write a pool data, va: %p, offset: %llu,size: %llu",
+            peer->node_id, va, offset, size);
+
+        char temp[64];
+        memset(temp, 0, sizeof(temp));
+        sprintf(temp, "%p", (void*)(va + offset));
+        void* recv_data = (void*)((uint64_t)recv_base + sizeof(WritePoolData));
+        void* recv_data_begin = (void*)((uint64_t)recv_data + sizeof(temp));
+        void* recv_data_end
+            = (void*)((uint64_t)recv_data + size + sizeof(temp));
+        while (memcmp(recv_data, temp, sizeof(temp)))
+            ;
+        while (memcmp(recv_data_end, temp, sizeof(temp)))
+            ;
+        memcpy((void*)(va + offset), recv_data_begin, size);
     }
 }
 
@@ -462,7 +488,10 @@ bool Client::SendGetPoolData(uint16_t node_id, uint64_t virtual_address,
         memset(temp, 0, sizeof(temp));
         sprintf(temp, "%p", (void*)(virtual_address + offset));
         while (memcmp(recv_base, temp, sizeof(temp)))
-            ; //直到收到数据
+            ; //收到数据头部
+        while (memcmp((void*)((uint64_t)recv_base + size + sizeof(temp)), temp,
+                      sizeof(temp)))
+            ; //直到收到数据尾部
         memcpy(result, (void*)((uint64_t)recv_base + sizeof(temp)),
                size); //将数据复制到结果
         return true;
@@ -509,6 +538,86 @@ bool Client::GetRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
     {
         Debug::notifyError(
             "GetRemotePoolData: poolid: %llu,SendFindPool Failed", pool_id);
+        return false;
+    }
+}
+
+bool Client::SendWritePoolData(uint16_t node_id, uint64_t virtual_address,
+                               uint64_t offset, size_t size, void* source)
+{
+    WritePoolData send;
+    ibv_wc wc[1];
+    send.type_ = WRITEPOOLDATA;
+    send.virtual_address_ = virtual_address;
+    send.offset_ = offset;
+    send.size_ = size;
+
+    PeerConnection* peer = peers[node_id];
+    void* send_base = (void*)(peer->my_buf_addr_);
+    memcpy(send_base, &send, sizeof(WritePoolData));
+    rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                          sizeof(WritePoolData));
+    if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+    {
+        char temp[64];
+        void* send_data = (void*)((uint64_t)send_base + sizeof(temp));
+        void* send_data_end = (void*)((uint64_t)send_data + size);
+        memset(send_base, 0, FOURMB);
+        memset(temp, 0, sizeof(temp));
+        sprintf(temp, "%p", (void*)(virtual_address + offset));
+        memcpy(send_base, temp, sizeof(temp));
+        memcpy(send_data, source, size);
+        memcpy(send_data_end, temp, sizeof(temp));
+        std::cout << "Remote Write to node : " << node_id << ": "
+                  << (char*)send_base << " " << send_data << ": "
+                  << (char*)send_data_end << std::endl;
+        rdmasocket_->RemoteWrite(peer, (uint64_t)send_base,
+                                 sizeof(WritePoolData),
+                                 sizeof(temp) * 2 + size);
+        return true;
+    }
+    else
+    {
+        Debug::notifyError("Client send the Write Pool Data request Failed");
+        return false;
+    }
+}
+
+bool Client::WriteRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
+                                 void* source)
+{
+    GetRemotePool remote_pool_info;
+    if (SendFindPool(pool_id, &remote_pool_info))
+    {
+        if (ConnectClient(remote_pool_info.node_id_))
+        {
+            if (SendWritePoolData(remote_pool_info.node_id_,
+                                  remote_pool_info.virtual_address_, offset,
+                                  size, source))
+            {
+                return true;
+            }
+            else
+            {
+                Debug::notifyError("WriteRemotePoolData: SendWritePoolData \
+                    Failed: node_id:%d, va: %p, offset: %llu, size: %llu",
+                                   remote_pool_info.node_id_,
+                                   remote_pool_info.virtual_address_, offset,
+                                   size);
+                return false;
+            }
+        }
+        else
+        {
+            Debug::notifyError("WriteRemotePoolData: Connect Client %d: Failed",
+                               remote_pool_info.node_id_);
+            return false;
+        }
+    }
+    else
+    {
+        Debug::notifyError(
+            "WriteRemotePoolData: poolid: %llu,SendFindPool Failed", pool_id);
         return false;
     }
 }

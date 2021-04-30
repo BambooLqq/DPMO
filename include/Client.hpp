@@ -96,6 +96,12 @@ class Client
 
     static void SignalTerm(int sig);
 
+    bool SendGetPoolData(uint16_t node_id, uint64_t virtual_address,
+                         uint64_t offset, size_t size, void* result);
+
+    bool SendWritePoolData(uint16_t node_id, uint64_t virtual_address,
+                           uint64_t offset, size_t size, void* source);
+
 public:
     Client(int sock_port = 0, std::string config_file_path = "",
            std::string device_name = "", uint32_t rdma_port = 1);
@@ -108,12 +114,12 @@ public:
     bool SendDeletePool(uint64_t pool_id);
 
     bool SendFindPool(uint64_t pool_id, GetRemotePool* result);
-
-    bool SendGetPoolData(uint16_t node_id, uint64_t virtual_address,
-                         uint64_t offset, size_t size, void* result);
-
+   
     bool GetRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
                            void* result);
+
+    bool WriteRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
+                             void* source);
 
     bool SendMessageToServer();
 };

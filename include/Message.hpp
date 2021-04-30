@@ -9,6 +9,7 @@ typedef enum
     FINDPOOL,
     DELETEPOOL,
     GETPOOLDATA,
+    WRITEPOOLDATA,
 } Message;
 
 typedef enum
@@ -40,6 +41,13 @@ struct DeletePool : Request
 };
 
 struct GetPoolData : Request
+{
+    uint64_t virtual_address_;
+    uint64_t offset_;
+    size_t size_;
+};
+
+struct WritePoolData : Request
 {
     uint64_t virtual_address_;
     uint64_t offset_;
