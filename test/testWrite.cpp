@@ -35,6 +35,13 @@ int main(int argc, char** argv)
     std::cin >> rootp.str;
     rootp.len = strlen(rootp.str);
     rdmapmem_direct_write(root, sizeof(Root), &rootp);
+    Root* p = (Root*)pmemobj_direct(root);
+
+    printf("p = %p\n", p);
+    std::cout << p->len << std::endl;
+    std::cout << p->str << std::endl;
+    getchar();
+    getchar();
     rdmapmemobj_close(pop);
     DisConnectServer();
     return 0;
