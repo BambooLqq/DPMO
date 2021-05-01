@@ -151,7 +151,14 @@ int main(int argc, char** argv)
     }
 
     client->GetRemotePoolData(1234, 3, 13, res);
-    std::cout << "res: " << res << std::endl;
+    printf("res: %s\n", (char *)res);
+    fflush(stdout);
+    char s[128] = "I am client 2 hhhh";
+    memcpy(res, s, strlen(s) + 1);
+    std::cout << "s :" << (char *)res << std::endl;
+
+    client->WriteRemotePoolData(1234, 16, strlen(s) + 1, res);
+    fflush(stdout);
     while (1)
     {
     }

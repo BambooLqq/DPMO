@@ -28,7 +28,7 @@ add_executable(server
         ${PROJECT_SOURCE_DIR}/src/Server.cpp
 )
 add_executable(client 
-        ${PROJECT_SOURCE_DIR}/RunClient.cpp
+        ${PROJECT_SOURCE_DIR}/RunClient2.cpp
         ${PROJECT_SOURCE_DIR}/src/Client.cpp
 )
 

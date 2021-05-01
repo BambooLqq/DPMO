@@ -652,7 +652,7 @@ bool Client::SendMessageToServer()
                           sizeof(buf));
     if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
     {
-        std::cout << "Send Success";
+        std::cout << "Send Success" << std::endl;
     }
     return true;
 }
