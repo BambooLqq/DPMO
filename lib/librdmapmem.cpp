@@ -1,17 +1,4 @@
-#include "Client.hpp"
-
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <getopt.h>
-
-Client* client;
-struct Config
-{
-    uint32_t sock_port_ = 5678;
-    uint32_t ib_port_ = 1;
-    std::string ib_dev_;
-    std::string config_file_;
-} config;
+#include "librdmapmem.hpp"
 
 static struct option long_options[5]
     = {{.name = "port", .has_arg = 1, .flag = 0, .val = 'p'},
@@ -19,14 +6,6 @@ static struct option long_options[5]
        {.name = "ib-port", .has_arg = 1, .flag = 0, .val = 'i'},
        {.name = "config-file", .has_arg = 1, .flag = 0, .val = 'c'},
        {.name = NULL, .has_arg = 0, .flag = 0, .val = '\0'}};
-
-/* Catch ctrl-c and destruct. */
-void Stop(int signo)
-{
-    delete client;
-    Debug::notifyInfo("Client is terminated, Bye.");
-    _exit(0);
-}
 
 static void usage(const char* argv0)
 {
@@ -98,78 +77,125 @@ static int ParseArgv(int argc, char** argv)
     return 0;
 }
 
-int main(int argc, char** argv)
+bool ConnectServer(int argc, char** argv)
 {
     if (ParseArgv(argc, argv))
     {
-        return 1;
+        return false;
     }
     print_config();
-    signal(SIGINT, Stop);
     client = new Client(config.sock_port_, config.config_file_, config.ib_dev_,
                         config.ib_port_);
-    client->SendMessageToServer();
-
-    void* buf = malloc(1024);
-    memset(buf, 0, 1024);
-    if (buf == NULL)
+    if (client != NULL)
     {
-        std::cout << "malloc failed" << std::endl;
+        return true;
     }
     else
     {
-        printf("buf: %p\n", buf);
+        return false;
     }
-    const char* source = "   I am Client 1";
+}
 
-    memcpy(buf, source, strlen(source));
-    client->SendCreatePool(1234, 0x1234abcd);
-    client->SendCreatePool(1234, 0x5678abcd);
-    client->SendDeletePool(1245);
-    client->SendDeletePool(1234);
-    client->SendCreatePool(1234, (uint64_t)buf);
-    GetRemotePool result;
-    if (client->SendFindPool(1234, &result))
+PMEMobjpool* rdmapmemobj_open(const char* path, const char* layout)
+{
+    PMEMobjpool* pool = NULL;
+
+    if ((pool = pmemobj_open(path, layout)))
     {
-        std::cout << "result: ip is : " << result.ip_ << std::endl;
-        std::cout << "result: node id is : " << result.node_id_ << std::endl;
-        std::cout << "result: va is : " << std::hex << result.virtual_address_
-                  << std::dec << std::endl;
+        size_t size = pmemobj_root_size(pool);
+        uint64_t pool_id;
+        if (size)
+        {
+            PMEMoid root = pmemobj_root(pool, size);
+            pool_id = root.pool_uuid_lo;
+        }
+        else
+        {
+            struct Root
+            {
+                int size;
+            };
+            PMEMoid root = pmemobj_root(pool, sizeof(Root));
+            pool_id = root.pool_uuid_lo;
+            pmemobj_free(&root);
+        }
+        client->SendCreatePool(pool_id, (uint64_t)pool);
+    }
+    return pool;
+}
+
+PMEMobjpool* rdmapmemobj_create(const char* path, const char* layout,
+                                size_t poolsize, mode_t mode)
+{
+    PMEMobjpool* pool = NULL;
+
+    if ((pool = pmemobj_create(path, layout, poolsize, mode)))
+    {
+        struct Root
+        {
+            int size;
+        };
+        PMEMoid root = pmemobj_root(pool, sizeof(Root));
+        uint64_t pool_id = root.pool_uuid_lo;
+        pmemobj_free(&root);
+        client->SendCreatePool(pool_id, (uint64_t)pool);
+    }
+    return pool;
+}
+
+void rdmapmemobj_close(PMEMobjpool* pop)
+{
+    // pmemobj_close(pop);
+    size_t size = pmemobj_root_size(pop);
+    uint64_t pool_id = 0;
+    if (size)
+    {
+        PMEMoid root = pmemobj_root(pop, size);
+        pool_id = root.pool_uuid_lo;
+    }
+    else // size == 0
+    {
+        struct Root
+        {
+            int size;
+        };
+        PMEMoid root = pmemobj_root(pop, sizeof(Root));
+        pool_id = root.pool_uuid_lo;
+        pmemobj_free(&root);
+    }
+    pmemobj_close(pop);
+    client->SendDeletePool(pool_id);
+}
+
+void rdmapmem_direct_read(PMEMoid oid, size_t size, void* result)
+{
+    void* ret = nullptr;
+    if ((ret = pmemobj_direct(oid))) // localdata
+    {
+        memcpy(result, ret, size);
     }
     else
     {
-        std::cout << "Not Found Poolid " << 1234 << std::endl;
+        client->GetRemotePoolData(oid.pool_uuid_lo, oid.off, size, result);
     }
+}
 
-    if (client->SendFindPool(2345, &result))
+void rdmapmem_direct_write(PMEMoid oid, size_t size, void* source)
+{
+    void* ret = nullptr;
+    if ((ret = pmemobj_direct(oid))) // local data
     {
-        std::cout << "result: ip is : " << result.ip_ << std::endl;
-        std::cout << "result: node id is : " << result.node_id_ << std::endl;
-        std::cout << "result: va is : 0x" << std::hex << result.virtual_address_
-                  << std::dec << std::endl;
+        PMEMobjpool* pool = pmemobj_pool_by_oid(oid);
+        pmemobj_memcpy_persist(pool, ret, source, size);
+        //  memcpy(ret, source, size);
     }
     else
     {
-        std::cout << "Not Found Poolid " << 2345 << std::endl;
+        client->WriteRemotePoolData(oid.pool_uuid_lo, oid.off, size, source);
     }
+}
 
-    while (1)
-    {
-        usleep(1000);
-        std::cout << "buf:recv: " << (char*)buf << std::endl;
-    }
-    while (1)
-    {
-    }
+void DisConnectServer()
+{
     delete client;
-    // while (true)
-    // {
-    //     getchar();
-    //     printf("storage addr = %lx\n", (long)p);
-    //     for (int i = 0; i < 12; i++)
-    //     {
-    //         printf("%c", p[i]);
-    //     }
-    //     printf("\n");
-    // }
 }

@@ -41,3 +41,11 @@ target_link_libraries(server DPMO)
 target_link_libraries(client DPMO)
 
 
+
+SET(RDMAPMEM_SRC
+        ${DPMO_SRC}
+        ${PROJECT_SOURCE_DIR}/src/Client.cpp
+        ${PROJECT_SOURCE_DIR}/lib/librdmapmem.cpp
+)
+add_library(rdmapmem SHARED ${RDMAPMEM_SRC})
+target_link_libraries(rdmapmem ibverbs pthread pmemobj)

@@ -27,3 +27,7 @@ an RDMA-enabled distributed Persistent Memory Object System
 - Send/Recv 消息机制 可以用来传输请求
 - Read/Recv 内存读写 用来传输数据
 
+
+### 2021-5-1
+1. 考虑RDMA Write时，刷写至持久内存中
+2. 考虑RDMA Read时，将数据直接读入持久内存中
