@@ -2,6 +2,11 @@
 
 an RDMA-enabled distributed Persistent Memory Object System
 
+## Build
+- mkdir build && cd build && cmake .. && make server
+- ./bin/server
+- cd ../test && mkdir build && cd build && cmake .. && make -j32
+
 ### RDMA Write to persistent Memory domain
   
 当使用RDMA write的时候，一般会直写到CPU的L3 cache，为了直写到Persistent Memory

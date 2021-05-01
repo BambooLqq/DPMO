@@ -30,6 +30,7 @@ int main(int argc, char** argv)
         return 1;
     }
     PMEMoid root = pmemobj_root(pop, sizeof(struct Root));
+    std::cout << root.off << std::endl;
     Root rootp;
     std::cin >> rootp.str;
     rootp.len = strlen(rootp.str);
