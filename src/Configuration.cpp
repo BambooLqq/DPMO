@@ -2,12 +2,14 @@
 
 #include "Debug.hpp"
 
+#define testpath "/home/user/zyp/dpmo/conf.xml"
+
 Configuration::Configuration()
 {
     server_count_ = 0;
     client_count_ = 0;
     server_nodeid_ = 0;
-    std::string path = "../conf.xml";
+    std::string path = testpath;
     char resolved_path[1024];
     memset(resolved_path, 0, 1024);
     realpath(path.c_str(), resolved_path);
@@ -72,7 +74,7 @@ Configuration::Configuration(std::string config_file_path)
     server_nodeid_ = 0;
     if (config_file_path.size() == 0)
     {
-        std::string path = "../conf.xml";
+        std::string path = testpath;
         char resolved_path[1024];
         memset(resolved_path, 0, 1024);
         realpath(path.c_str(), resolved_path);

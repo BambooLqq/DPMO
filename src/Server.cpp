@@ -82,9 +82,8 @@ bool Server::AddPool(uint64_t pool_id, uint16_t node_id, uint64_t va)
     std::unique_lock<std::mutex> mlock(m);
     if (pool_info_.find(pool_id) != pool_info_.end())
     {
-        Debug::notifyError("The Pool %ld had been created by node %d ,VA :%lld",
+        Debug::notifyError("The Pool %lu had been created by node %d ,VA :%p",
                            pool_id, pool_info_.find(pool_id)->second->node_id_,
-                           pool_id,
                            pool_info_.find(pool_id)->second->virtual_address_);
         mlock.unlock();
         cond.notify_one();
@@ -104,11 +103,11 @@ PoolInfo* Server::GetPool(uint64_t pool_id)
     ID2POOL::iterator itr = pool_info_.find(pool_id);
     if (itr != pool_info_.end())
     {
-        Debug::notifyInfo("Find the pool %ld in node %d, va: %p", pool_id,
+        Debug::notifyInfo("Find the pool %lu in node %d, va: %p", pool_id,
                           itr->second->node_id_, itr->second->virtual_address_);
         return pool_info_.find(pool_id)->second;
     }
-    Debug::notifyError("Don't exist the pool %d", pool_id);
+    Debug::notifyError("Don't exist the pool %lu", pool_id);
     mlock.unlock();
     cond.notify_one();
     return NULL;
@@ -121,12 +120,12 @@ bool Server::DeletePool(uint64_t pool_id)
     if (itr != pool_info_.end())
     {
         Debug::notifyInfo(
-            "DeletePool: find the pool %ld, VA: %p, node_id is %d", pool_id,
+            "DeletePool: find the pool %lu, VA: %p, node_id is %d", pool_id,
             itr->second->virtual_address_, itr->second->node_id_);
         pool_info_.erase(pool_id);
         return true;
     }
-    Debug::notifyError("Don't exist the pool %d", pool_id);
+    Debug::notifyError("Don't exist the pool %lu", pool_id);
     mlock.unlock();
     cond.notify_one();
     return false;
@@ -164,6 +163,10 @@ void Server::Accecpt(int sock)
         else
         {
             peer->counter = 0;
+            if (peers[peer->node_id])
+            {
+                delete peers[peer->node_id];
+            }
             peers[peer->node_id] = peer;
             my_node_id_ = rdmasocket_->GetNodeId();
             Debug::notifyInfo("Client %d Connect Server %d", peer->node_id,
@@ -177,6 +180,14 @@ void Server::Accecpt(int sock)
             }
             std::thread* poll_cq_
                 = new std::thread(&Server::ProcessRequest, this, peer);
+            if (poll_request[peer->node_id])
+            {
+                pthread_t tid = poll_request[peer->node_id]->native_handle();
+                std::cout << "poll_thread_id is: " << tid << std::endl;
+                pthread_kill(tid, SIGTERM);
+                poll_request[peer->node_id]->join();
+                delete poll_request[peer->node_id];
+            }
             poll_request[peer->node_id] = poll_cq_;
             Debug::debugItem("Accepted to Node%d", peer->node_id);
         }
@@ -269,7 +280,7 @@ bool Server::ProcessRecv(uint16_t node_id)
             CreatePool create_pool_req
                 = *(CreatePool*)(peer->my_buf_addr_ + FOURMB);
             Debug::notifyInfo(
-                "Client %d request add a pool: poolid %d, virtual address: %p",
+                "Client %d request add a pool: poolid %lu, virtual address: %p",
                 node_id, create_pool_req.pool_id_,
                 create_pool_req.virtual_addr_);
             if (AddPool(create_pool_req.pool_id_, create_pool_req.node_id,
@@ -306,7 +317,7 @@ bool Server::ProcessRecv(uint16_t node_id)
         {
             struct DeletePool delete_pool_cq
                 = *(struct DeletePool*)(peer->my_buf_addr_ + FOURMB);
-            Debug::notifyInfo("Client %d request delete a pool: poolid %d",
+            Debug::notifyInfo("Client %d request delete a pool: poolid %lu",
                               node_id, delete_pool_cq.pool_id_);
             if (DeletePool(delete_pool_cq.pool_id_))
             {
@@ -347,7 +358,7 @@ bool Server::ProcessRecv(uint16_t node_id)
         {
             FindPool find_pool_cq
                 = *(struct FindPool*)(peer->my_buf_addr_ + FOURMB);
-            Debug::notifyInfo("Client %d request find a pool: poolid %d",
+            Debug::notifyInfo("Client %d request find a pool: poolid %lu",
                               node_id, find_pool_cq.pool_id_);
 
             if (PoolInfo* ret = GetPool(find_pool_cq.pool_id_))

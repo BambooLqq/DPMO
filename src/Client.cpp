@@ -74,7 +74,6 @@ Client::~Client()
     poll_request_thread_.clear();
     Debug::notifyInfo("poll_request_thread Clear Successfully");
 
-
     if (rdmasocket_)
     {
         delete rdmasocket_;
@@ -109,10 +108,12 @@ bool Client::ConnectServer()
     }
     else
     {
-        std::cout << "bengin2" << std::endl;
+        if (peers[peer->node_id])
+        {
+            delete peers[peer->node_id];
+        }
         peers[peer->node_id] = peer;
         peer->counter = 0;
-        std::cout << "bengin2" << std::endl;
         Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
         return true;
     }
@@ -149,6 +150,10 @@ bool Client::ConnectClient(uint16_t node_id)
     }
     else
     {
+        if (peers[peer->node_id])
+        {
+            delete peers[peer->node_id];
+        }
         peers[peer->node_id] = peer;
         peer->counter = 0;
         Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
@@ -201,6 +206,10 @@ void Client::Accept(int sock)
         else
         {
             peer->counter = 0;
+            if (peers[peer->node_id])
+            {
+                delete peers[peer->node_id];
+            }
             peers[peer->node_id] = peer;
             Debug::notifyInfo("Client %d Connect Client %d", peer->node_id,
                               my_node_id_);
@@ -213,6 +222,15 @@ void Client::Accept(int sock)
             }
             std::thread* poll_cq_
                 = new std::thread(&Client::ProcessRequest, this, peer);
+            if (poll_request_thread_[peer->node_id])
+            {
+                pthread_t tid
+                    = poll_request_thread_[peer->node_id]->native_handle();
+                std::cout << "poll_thread_id is: " << tid << std::endl;
+                pthread_kill(tid, SIGTERM);
+                poll_request_thread_[peer->node_id]->join();
+                delete poll_request_thread_[peer->node_id];
+            }
             poll_request_thread_[peer->node_id] = poll_cq_;
             Debug::debugItem("Accepted to Node%d", peer->node_id);
         }
