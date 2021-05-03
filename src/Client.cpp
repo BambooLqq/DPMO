@@ -12,11 +12,11 @@ Client::Client(int sock_port, std::string config_file_path,
 
     if (addr_ == 0)
     {
-        Debug::notifyError("Client Alloc Memory size %d failed", buf_size_);
+        Debug::notifyError("Client Alloc Memory size %llx failed", buf_size_);
     }
     else
     {
-        Debug::notifyInfo("Client Alloc Memory size %d at addr: %p successd",
+        Debug::notifyInfo("Client Alloc Memory size %llx at addr: %p successd",
                           buf_size_, addr_);
         memset((char*)addr_, 0, buf_size_);
     }
@@ -114,7 +114,7 @@ bool Client::ConnectServer()
         }
         peers[peer->node_id] = peer;
         peer->counter = 0;
-        Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
+        Debug::debugItem("Finished Connecting to Node %d", peer->node_id);
         return true;
     }
 }
@@ -156,7 +156,7 @@ bool Client::ConnectClient(uint16_t node_id)
         }
         peers[peer->node_id] = peer;
         peer->counter = 0;
-        Debug::debugItem("Finished Connecting to Node%d", peer->node_id);
+        Debug::debugItem("Finished Connecting to Node %d", peer->node_id);
         return true;
     }
 }
@@ -232,7 +232,7 @@ void Client::Accept(int sock)
                 delete poll_request_thread_[peer->node_id];
             }
             poll_request_thread_[peer->node_id] = poll_cq_;
-            Debug::debugItem("Accepted to Node%d", peer->node_id);
+            Debug::debugItem("Accepted to Node %d", peer->node_id);
         }
     }
 }
@@ -353,7 +353,7 @@ bool Client::SendFindPool(uint64_t pool_id, GetRemotePool* result)
                     = ((FindResponse*)response)->virtual_addr_;
                 memcpy(result->ip_, ((FindResponse*)response)->ip_,
                        sizeof(FindResponse::ip_));
-                Debug::notifyInfo("Pool %ld is in node %d, VA: %p, ip :%s",
+                Debug::notifyInfo("Pool %llx is in node %d, VA: %p, ip :%s",
                                   pool_id, result->node_id_,
                                   result->virtual_address_, result->ip_);
                 return true;
@@ -480,7 +480,7 @@ void Client::ProcessRecv(PeerConnection* peer)
         while (memcmp(recv_data_end, temp, sizeof(temp)))
             ;
         memcpy((void*)(va + offset), recv_data_begin, size); // need to persisit
-        pmem_persist((void*)(va + offset), size); // 
+        pmem_persist((void*)(va + offset), size);            //
     }
     else if (recv->type_ == CREATEREMOTEPOOL)
     {
@@ -490,7 +490,7 @@ void Client::ProcessRecv(PeerConnection* peer)
         const char* layout = create_pool.layout;
         size_t poolsize = create_pool.poolsize;
         Debug::notifyInfo(
-            "Client %d request create a pool, path: %s, layout: %s, size: %lu",
+            "Client %d request create a pool, path: %s, layout: %s, size: %llu",
             peer->node_id, path, layout, poolsize);
 
         PMEMobjpool* pool = NULL;
@@ -504,7 +504,7 @@ void Client::ProcessRecv(PeerConnection* peer)
             PMEMoid root = pmemobj_root(pool, sizeof(Root));
             uint64_t pool_id = root.pool_uuid_lo;
             pmemobj_free(&root);
-            Debug::notifyInfo("Create a pool Successfully, poolid is %lu",
+            Debug::notifyInfo("Create a pool Successfully, poolid is %llx",
                               pool_id);
             SendCreatePool(pool_id, (uint64_t)pool);
             response.op_ret_ = SUCCESS;
@@ -562,7 +562,7 @@ void Client::ProcessRecv(PeerConnection* peer)
                 pool_id = root.pool_uuid_lo;
                 pmemobj_free(&root);
             }
-            Debug::notifyInfo("Open a pool Successfully, poolid is %lu",
+            Debug::notifyInfo("Open a pool Successfully, poolid is %llx",
                               pool_id);
             SendCreatePool(pool_id, (uint64_t)pop);
             response.op_ret_ = SUCCESS;
@@ -593,25 +593,25 @@ void Client::ProcessRecv(PeerConnection* peer)
     {
         struct CloseRemotePool open_pool = *(struct CloseRemotePool*)recv_base;
         uint64_t pool_id = open_pool.pool_id_;
-        Debug::notifyInfo("Client %d request close a pool,pool_id: %llu",
+        Debug::notifyInfo("Client %d request close a pool,pool_id: %llx",
                           peer->node_id, pool_id);
         GetRemotePool result;
         PMEMobjpool* pop = NULL;
         Response response;
         if (SendFindPool(pool_id, &result))
         {
-            Debug::notifyInfo("Find the pool: poolid: %llu, va: %p", pool_id,
+            Debug::notifyInfo("Find the pool: poolid: %llx, va: %p", pool_id,
                               result.virtual_address_);
             pop = (PMEMobjpool*)result.virtual_address_;
             SendDeletePool(pool_id);
             pmemobj_close(pop);
-            Debug::notifyInfo("Close a pool Successfully, poolid is %lu",
+            Debug::notifyInfo("Close a pool Successfully, poolid is %llx",
                               pool_id);
             response.op_ret_ = SUCCESS;
         }
         else
         {
-            Debug::notifyInfo("Find the pool: poolid: %llu, failed", pool_id);
+            Debug::notifyInfo("Find the pool: poolid: %llx, failed", pool_id);
             response.op_ret_ = FAIL;
         }
         uint64_t send_base = peer->my_buf_addr_;
@@ -637,7 +637,7 @@ void Client::ProcessRecv(PeerConnection* peer)
         size_t size = pool_root.size_;
         uint64_t va = pool_root.va_;
         Debug::notifyInfo(
-            "Client %d request a pool root, pool_id: %llu, size: %lu",
+            "Client %d request a pool root, pool_id: %llx, size: %llu",
             peer->node_id, pool_id, size);
 
         GetRemotePool result;
@@ -735,7 +735,7 @@ bool Client::GetRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
     else
     {
         Debug::notifyError(
-            "GetRemotePoolData: poolid: %llu,SendFindPool Failed", pool_id);
+            "GetRemotePoolData: poolid: %llx,SendFindPool Failed", pool_id);
         return false;
     }
 }
@@ -815,7 +815,7 @@ bool Client::WriteRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
     else
     {
         Debug::notifyError(
-            "WriteRemotePoolData: poolid: %llu,SendFindPool Failed", pool_id);
+            "WriteRemotePoolData: poolid: %llx,SendFindPool Failed", pool_id);
         return false;
     }
 }
@@ -867,7 +867,7 @@ uint64_t Client::SendCreateRemotePool(uint16_t node_id, const char* path,
                 uint64_t ret_pool_id
                     = ((CreateRemotePoolResponse*)recv_base)->pool_id_;
                 Debug::notifyInfo(
-                    "client %d response: CreatePool Success, poolid is :%llu",
+                    "client %d response: CreatePool Success, poolid is : %llx",
                     node_id, ret_pool_id);
                 return ret_pool_id;
             }
@@ -918,7 +918,7 @@ uint64_t Client::SendOpenRemotePool(uint16_t node_id, const char* path,
                 uint64_t ret_pool_id
                     = ((OpenRemotePoolResponse*)recv_base)->pool_id_;
                 Debug::notifyInfo(
-                    "client %d response: OpenPool Success, poolid is :%llu",
+                    "client %d response: OpenPool Success, poolid is :%llx",
                     node_id, ret_pool_id);
                 return ret_pool_id;
             }
@@ -965,7 +965,7 @@ bool Client::SendCloseRemotePool(uint16_t node_id, uint64_t pool_id)
             if (response->op_ret_ == SUCCESS)
             {
                 Debug::notifyInfo(
-                    "client %d response: ClosePool Success, poolid is :%llu",
+                    "client %d response: ClosePool Success, poolid is :%llx",
                     pool_id);
                 return true;
             }
@@ -1074,9 +1074,9 @@ void Client::CloseRemotePool(uint16_t node_id, uint64_t pool_id)
             PMEMobjpool* pop = (PMEMobjpool*)(result.virtual_address_);
             SendDeletePool(pool_id);
             pmemobj_close(pop);
-            Debug::notifyInfo("Close pool %llu successfullt", pool_id);
+            Debug::notifyInfo("Close pool %llx successfullt", pool_id);
         }
-        Debug::notifyError("Not Find pool %llu", pool_id);
+        Debug::notifyError("Not Find pool %llx", pool_id);
         return;
     }
     else if (!IsConnected(node_id))
@@ -1120,7 +1120,7 @@ PMEMoid Client::SendRemotePoolRoot(uint16_t node_id, uint64_t pool_id,
             {
                 ret = ((RemotePoolRootReponse*)recv_base)->oid_;
                 Debug::notifyInfo(
-                    "client %d response: PoolRoot Success, poolid is :%llu, offset: %llu",
+                    "client %d response: PoolRoot Success, poolid is :%llx, offset: %llu",
                     node_id, ret.pool_uuid_lo, ret.off);
                 return ret;
             }
@@ -1151,7 +1151,7 @@ PMEMoid Client::RemotePoolRoot(uint64_t pool_id, size_t size)
     if (SendFindPool(pool_id, &result))
     {
         PMEMobjpool* pop = (PMEMobjpool*)(result.virtual_address_);
-        Debug::notifyInfo("Close pool %llu successfullt", pool_id);
+        Debug::notifyInfo("Close pool %llx  successfullt", pool_id);
         if (result.node_id_ == my_node_id_) // local pool
         {
             return pmemobj_root(pop, size);
@@ -1164,7 +1164,7 @@ PMEMoid Client::RemotePoolRoot(uint64_t pool_id, size_t size)
     }
     else
     {
-        Debug::notifyError("Not Find pool %llu", pool_id);
+        Debug::notifyError("Not Find pool %llx ", pool_id);
         return;
     }
 }

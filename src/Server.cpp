@@ -10,11 +10,11 @@ Server::Server(int sock_port, std::string config_file_path,
 
     if (ret != 0 || (void*)addr_ == NULL)
     {
-        Debug::notifyError("Server Alloc Memory size %d failed", buf_size_);
+        Debug::notifyError("Server Alloc Memory size %llx failed", buf_size_);
     }
     else
     {
-        Debug::notifyInfo("Server Alloc Memory size %d successd at %p",
+        Debug::notifyInfo("Server Alloc Memory size %llx successd at %p",
                           buf_size_, addr_);
     }
     rdmasocket_ = new RdmaSocket(addr_, buf_size_, conf_, true, 0, sock_port,
@@ -82,7 +82,7 @@ bool Server::AddPool(uint64_t pool_id, uint16_t node_id, uint64_t va)
     std::unique_lock<std::mutex> mlock(m);
     if (pool_info_.find(pool_id) != pool_info_.end())
     {
-        Debug::notifyError("The Pool %lu had been created by node %d ,VA :%p",
+        Debug::notifyError("The Pool %llx had been created by node %d ,VA :%p",
                            pool_id, pool_info_.find(pool_id)->second->node_id_,
                            pool_info_.find(pool_id)->second->virtual_address_);
         mlock.unlock();
@@ -103,11 +103,11 @@ PoolInfo* Server::GetPool(uint64_t pool_id)
     ID2POOL::iterator itr = pool_info_.find(pool_id);
     if (itr != pool_info_.end())
     {
-        Debug::notifyInfo("Find the pool %lu in node %d, va: %p", pool_id,
+        Debug::notifyInfo("Find the pool %llx in node %d, va: %p", pool_id,
                           itr->second->node_id_, itr->second->virtual_address_);
         return pool_info_.find(pool_id)->second;
     }
-    Debug::notifyError("Don't exist the pool %lu", pool_id);
+    Debug::notifyError("Don't exist the pool %llx", pool_id);
     mlock.unlock();
     cond.notify_one();
     return NULL;
@@ -120,12 +120,12 @@ bool Server::DeletePool(uint64_t pool_id)
     if (itr != pool_info_.end())
     {
         Debug::notifyInfo(
-            "DeletePool: find the pool %lu, VA: %p, node_id is %d", pool_id,
+            "DeletePool: find the pool %llx, VA: %p, node_id is %d", pool_id,
             itr->second->virtual_address_, itr->second->node_id_);
         pool_info_.erase(pool_id);
         return true;
     }
-    Debug::notifyError("Don't exist the pool %lu", pool_id);
+    Debug::notifyError("Don't exist the pool %llx", pool_id);
     mlock.unlock();
     cond.notify_one();
     return false;
@@ -250,8 +250,8 @@ void Server::ProcessRequest(PeerConnection* peer) //
                 // break;
             case IBV_WC_RECV_RDMA_WITH_IMM:
                 //debug
-                std::cout << (char*)GetClientRecvBaseAddr(peer->node_id)
-                          << std::endl;
+                // std::cout << (char*)GetClientRecvBaseAddr(peer->node_id)
+                //           << std::endl;
                 Debug::notifyInfo("Peer->node_id is %d, Recv node id is %d",
                                   peer->node_id, wc->imm_data);
                 ProcessRecv(peer->node_id);
@@ -280,7 +280,7 @@ bool Server::ProcessRecv(uint16_t node_id)
             CreatePool create_pool_req
                 = *(CreatePool*)(peer->my_buf_addr_ + FOURMB);
             Debug::notifyInfo(
-                "Client %d request add a pool: poolid %lu, virtual address: %p",
+                "Client %d request add a pool: poolid %llx, virtual address: %p",
                 node_id, create_pool_req.pool_id_,
                 create_pool_req.virtual_addr_);
             if (AddPool(create_pool_req.pool_id_, create_pool_req.node_id,
@@ -317,7 +317,7 @@ bool Server::ProcessRecv(uint16_t node_id)
         {
             struct DeletePool delete_pool_cq
                 = *(struct DeletePool*)(peer->my_buf_addr_ + FOURMB);
-            Debug::notifyInfo("Client %d request delete a pool: poolid %lu",
+            Debug::notifyInfo("Client %d request delete a pool: poolid %llx",
                               node_id, delete_pool_cq.pool_id_);
             if (DeletePool(delete_pool_cq.pool_id_))
             {
@@ -358,7 +358,7 @@ bool Server::ProcessRecv(uint16_t node_id)
         {
             FindPool find_pool_cq
                 = *(struct FindPool*)(peer->my_buf_addr_ + FOURMB);
-            Debug::notifyInfo("Client %d request find a pool: poolid %lu",
+            Debug::notifyInfo("Client %d request find a pool: poolid %llx",
                               node_id, find_pool_cq.pool_id_);
 
             if (PoolInfo* ret = GetPool(find_pool_cq.pool_id_))
