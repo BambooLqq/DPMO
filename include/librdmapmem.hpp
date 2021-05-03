@@ -23,12 +23,13 @@ bool ConnectServer(int argc, char** argv); //
 
 void DisConnectServer();
 
-PMEMobjpool* rdmapmemobj_open(const char* path, const char* layout);
+uint64_t rdmapmemobj_open(uint16_t node_id, const char* path,
+                          const char* layout);
 
-PMEMobjpool* rdmapmemobj_create(const char* path, const char* layout,
-                                size_t poolsize, mode_t mode);
+uint64_t rdmapmemobj_create(uint16_t node_id, const char* path,
+                            const char* layout, size_t poolsize, mode_t mode);
 
-void rdmapmemobj_close(PMEMobjpool* pop);
+void rdmapmemobj_close(uint16_t node_id, uint64_t pool_id);
 
 // read oid ptr's data
 void rdmapmem_direct_read(PMEMoid oid, size_t size, void* result);

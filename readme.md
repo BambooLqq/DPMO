@@ -36,3 +36,6 @@ an RDMA-enabled distributed Persistent Memory Object System
 ### 2021-5-1
 1. 考虑RDMA Write时，刷写至持久内存中
 2. 考虑RDMA Read时，将数据直接读入持久内存中
+
+### 下一步
+- 实现远程创建池和对象

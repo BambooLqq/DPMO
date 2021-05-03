@@ -4,6 +4,9 @@
 #include "RdmaSocket.hpp"
 #include "stdlib.h"
 #include "Message.hpp"
+#include <libpmem.h>
+#include <libpmemobj.h>
+#include <libpmempool.h>
 // for client's mem
 // 为每个连接分配4KB的缓冲区
 // ***********************************************************************************************
@@ -102,6 +105,14 @@ class Client
     bool SendWritePoolData(uint16_t node_id, uint64_t virtual_address,
                            uint64_t offset, size_t size, void* source);
 
+    uint64_t SendCreateRemotePool(uint16_t node_id, const char* path,
+                              const char* layout, size_t poolsize, mode_t mode);
+
+    uint64_t SendOpenRemotePool(uint16_t node_id, const char* path,
+                                const char* layout);
+
+    bool SendCloseRemotePool(uint16_t nodeid, uint64_t pool_id);
+
 public:
     Client(int sock_port = 0, std::string config_file_path = "",
            std::string device_name = "", uint32_t rdma_port = 1);
@@ -114,12 +125,20 @@ public:
     bool SendDeletePool(uint64_t pool_id);
 
     bool SendFindPool(uint64_t pool_id, GetRemotePool* result);
-   
+
     bool GetRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
                            void* result);
 
     bool WriteRemotePoolData(uint64_t pool_id, uint64_t offset, size_t size,
                              void* source);
+
+    uint64_t CreateRemotePool(uint16_t node_id, const char* path,
+                              const char* layout, size_t poolsize, mode_t mode);
+
+    uint64_t OpenRemotePool(uint16_t node_id, const char* path,
+                            const char* layout);
+
+    void CloseRemotePool(uint16_t node_id, uint64_t pool_id);
 
     bool SendMessageToServer();
 };

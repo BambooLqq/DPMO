@@ -481,6 +481,154 @@ void Client::ProcessRecv(PeerConnection* peer)
             ;
         memcpy((void*)(va + offset), recv_data_begin, size);
     }
+    else if (recv->type_ == CREATEREMOTEPOOL)
+    {
+        struct CreateRemotePool create_pool
+            = *(struct CreateRemotePool*)recv_base;
+        const char* path = create_pool.path;
+        const char* layout = create_pool.layout;
+        size_t poolsize = create_pool.poolsize;
+        Debug::notifyInfo(
+            "Client %d request create a pool, path: %s, layout: %s, size: %lu",
+            peer->node_id, path, layout, poolsize);
+
+        PMEMobjpool* pool = NULL;
+        CreateRemotePoolResponse response;
+        if (pool = pmemobj_create(path, layout, poolsize, create_pool.mode))
+        {
+            struct Root
+            {
+                int size;
+            };
+            PMEMoid root = pmemobj_root(pool, sizeof(Root));
+            uint64_t pool_id = root.pool_uuid_lo;
+            pmemobj_free(&root);
+            Debug::notifyInfo("Create a pool Successfully, poolid is %lu",
+                              pool_id);
+            SendCreatePool(pool_id, (uint64_t)pool);
+            response.op_ret_ = SUCCESS;
+            response.pool_id_ = pool_id;
+        }
+        else
+        {
+            Debug::notifyInfo("Create a pool Failed");
+            response.op_ret_ = FAIL;
+        }
+        uint64_t send_base = peer->my_buf_addr_;
+        memcpy((void*)send_base, &response, sizeof(CreateRemotePoolResponse));
+        rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                              sizeof(CreateRemotePoolResponse));
+        ibv_wc wc[1];
+        if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+        {
+            Debug::notifyInfo("Response Client %d Createpool: success",
+                              peer->node_id);
+        }
+        else
+        {
+            Debug::notifyInfo("Response Client %d Createpool: failed",
+                              peer->node_id);
+        }
+    }
+    else if (recv->type_ == OPENREMOTEPOOL)
+    {
+        struct OpenRemotePool open_pool = *(struct OpenRemotePool*)recv_base;
+        const char* path = open_pool.path;
+        const char* layout = open_pool.layout;
+
+        Debug::notifyInfo("Client %d request open a pool, path: %s, layout: %s",
+                          peer->node_id, path, layout);
+
+        PMEMobjpool* pop = NULL;
+        OpenRemotePoolResponse response;
+
+        if (pop = pmemobj_open(path, layout))
+        {
+            size_t size = pmemobj_root_size(pop);
+            uint64_t pool_id;
+            if (size)
+            {
+                PMEMoid root = pmemobj_root(pop, size);
+                pool_id = root.pool_uuid_lo;
+            }
+            else
+            {
+                struct Root
+                {
+                    int size;
+                };
+                PMEMoid root = pmemobj_root(pop, sizeof(Root));
+                pool_id = root.pool_uuid_lo;
+                pmemobj_free(&root);
+            }
+            Debug::notifyInfo("Open a pool Successfully, poolid is %lu",
+                              pool_id);
+            SendCreatePool(pool_id, (uint64_t)pop);
+            response.op_ret_ = SUCCESS;
+            response.pool_id_ = pool_id;
+        }
+        else
+        {
+            Debug::notifyInfo("Open a pool Failed");
+            response.op_ret_ = FAIL;
+        }
+        uint64_t send_base = peer->my_buf_addr_;
+        memcpy((void*)send_base, &response, sizeof(OpenRemotePoolResponse));
+        rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                              sizeof(OpenRemotePoolResponse));
+        ibv_wc wc[1];
+        if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+        {
+            Debug::notifyInfo("Response Client %d OpenPool: success",
+                              peer->node_id);
+        }
+        else
+        {
+            Debug::notifyInfo("Response Client %d OpenPool: failed",
+                              peer->node_id);
+        }
+    }
+    else if (recv->type_ == CLOSEREMOTEPOOL)
+    {
+        struct CloseRemotePool open_pool = *(struct CloseRemotePool*)recv_base;
+        uint64_t pool_id = open_pool.pool_id_;
+        Debug::notifyInfo("Client %d request close a pool,pool_id: %llu",
+                          peer->node_id, pool_id);
+        GetRemotePool result;
+        PMEMobjpool* pop = NULL;
+        Response response;
+        if (SendFindPool(pool_id, &result))
+        {
+            Debug::notifyInfo("Find the pool: poolid: %llu, va: %p", pool_id,
+                              result.virtual_address_);
+            pop = (PMEMobjpool*)result.virtual_address_;
+            SendDeletePool(pool_id);
+            pmemobj_close(pop);
+            Debug::notifyInfo("Close a pool Successfully, poolid is %lu",
+                              pool_id);
+            response.op_ret_ = SUCCESS;
+        }
+        else
+        {
+            Debug::notifyInfo("Find the pool: poolid: %llu, failed", pool_id);
+            response.op_ret_ = FAIL;
+        }
+        uint64_t send_base = peer->my_buf_addr_;
+        memcpy((void*)send_base, &response, sizeof(Response));
+        rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                              sizeof(Response));
+        ibv_wc wc[1];
+        if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+        {
+            Debug::notifyInfo("Response Client %d Close: success",
+                              peer->node_id);
+        }
+        else
+        {
+            Debug::notifyInfo("Response Client %d ClosePool: failed",
+                              peer->node_id);
+        }
+    }
 }
 
 bool Client::SendGetPoolData(uint16_t node_id, uint64_t virtual_address,
@@ -655,4 +803,257 @@ bool Client::SendMessageToServer()
         std::cout << "Send Success" << std::endl;
     }
     return true;
+}
+
+uint64_t Client::SendCreateRemotePool(uint16_t node_id, const char* path,
+                                      const char* layout, size_t poolsize,
+                                      mode_t mode)
+{
+    struct CreateRemotePool send;
+    ibv_wc wc[1];
+    send.type_ = CREATEREMOTEPOOL;
+    memcpy(send.path, path, strlen(path) + 1);
+    memcpy(send.layout, layout, strlen(layout) + 1);
+    send.poolsize = poolsize;
+    send.mode = mode;
+
+    PeerConnection* peer = peers[node_id];
+
+    void* send_base = (void*)(peer->my_buf_addr_);
+    memcpy(send_base, &send, sizeof(struct CreateRemotePool));
+    rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                          sizeof(struct CreateRemotePool));
+    if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+    {
+        void* recv_base = (void*)((uint64_t)send_base + FOURMB);
+        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        {
+            Response* response = (Response*)recv_base;
+            if (response->op_ret_ == SUCCESS)
+            {
+                uint64_t ret_pool_id
+                    = ((CreateRemotePoolResponse*)recv_base)->pool_id_;
+                Debug::notifyInfo(
+                    "client %d response: CreatePool Success, poolid is :%llu",
+                    node_id, ret_pool_id);
+                return ret_pool_id;
+            }
+            else
+            {
+                Debug::notifyError("client %d response: CreatePool Failed!",
+                                   node_id);
+                return 0;
+            }
+        }
+        else
+        {
+            Debug::notifyError("Not recv the client's:%d response", node_id);
+            return 0;
+        }
+    }
+    else
+    {
+        Debug::notifyError("Client send the request: CreateRemotePool failed");
+        return 0;
+    }
+}
+
+uint64_t Client::SendOpenRemotePool(uint16_t node_id, const char* path,
+                                    const char* layout)
+{
+    struct OpenRemotePool send;
+    ibv_wc wc[1];
+    send.type_ = OPENREMOTEPOOL;
+    memcpy(send.path, path, strlen(path) + 1);
+    memcpy(send.layout, layout, strlen(layout) + 1);
+
+    PeerConnection* peer = peers[node_id];
+
+    void* send_base = (void*)(peer->my_buf_addr_);
+    memcpy(send_base, &send, sizeof(struct OpenRemotePool));
+    rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                          sizeof(struct OpenRemotePool));
+    if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+    {
+        void* recv_base = (void*)((uint64_t)send_base + FOURMB);
+        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        {
+            Response* response = (Response*)recv_base;
+            if (response->op_ret_ == SUCCESS)
+            {
+                uint64_t ret_pool_id
+                    = ((OpenRemotePoolResponse*)recv_base)->pool_id_;
+                Debug::notifyInfo(
+                    "client %d response: OpenPool Success, poolid is :%llu",
+                    node_id, ret_pool_id);
+                return ret_pool_id;
+            }
+            else
+            {
+                Debug::notifyError("client %d response: OpenPool Failed!",
+                                   node_id);
+                return 0;
+            }
+        }
+        else
+        {
+            Debug::notifyError("Not recv the client's:%d response", node_id);
+            return 0;
+        }
+    }
+    else
+    {
+        Debug::notifyError("Client send the request: OpenPool failed");
+        return 0;
+    }
+}
+
+bool Client::SendCloseRemotePool(uint16_t node_id, uint64_t pool_id)
+{
+    struct CloseRemotePool send;
+    ibv_wc wc[1];
+    send.type_ = CLOSEREMOTEPOOL;
+    send.pool_id_ = pool_id;
+
+    PeerConnection* peer = peers[node_id];
+
+    void* send_base = (void*)(peer->my_buf_addr_);
+    memcpy(send_base, &send, sizeof(struct CloseRemotePool));
+    rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
+                          sizeof(struct CloseRemotePool));
+    if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
+    {
+        void* recv_base = (void*)((uint64_t)send_base + FOURMB);
+        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        {
+            Response* response = (Response*)recv_base;
+            if (response->op_ret_ == SUCCESS)
+            {
+                Debug::notifyInfo(
+                    "client %d response: ClosePool Success, poolid is :%llu",
+                    pool_id);
+                return true;
+            }
+            else
+            {
+                Debug::notifyError("client %d response: ClosePool Failed!",
+                                   node_id);
+                return false;
+            }
+        }
+        else
+        {
+            Debug::notifyError("Not recv the client's:%d response", node_id);
+            return false;
+        }
+    }
+    else
+    {
+        Debug::notifyError("Client send the request: ClosePool failed");
+        return false;
+    }
+}
+
+uint64_t Client::CreateRemotePool(uint16_t node_id, const char* path,
+                                  const char* layout, size_t poolsize,
+                                  mode_t mode)
+{
+    if (node_id == 0)
+    {
+        PMEMobjpool* pool = NULL;
+        if ((pool = pmemobj_create(path, layout, poolsize, mode)))
+        {
+            struct Root
+            {
+                int size;
+            };
+            PMEMoid root = pmemobj_root(pool, sizeof(Root));
+            uint64_t pool_id = root.pool_uuid_lo;
+            pmemobj_free(&root);
+            SendCreatePool(pool_id, (uint64_t)pool);
+            return pool_id;
+        }
+        return 0;
+    }
+    else if (!IsConnected(node_id))
+    {
+        if (ConnectClient(node_id) == false)
+        {
+            Debug::notifyError("CreateRemotePool: Connect Client %d: Failed",
+                               node_id);
+            return 0;
+        }
+    }
+    return SendCreateRemotePool(node_id, path, layout, poolsize, mode);
+}
+
+uint64_t Client::OpenRemotePool(uint16_t node_id, const char* path,
+                                const char* layout)
+{
+    if (node_id == 0)
+    {
+        PMEMobjpool* pool = NULL;
+        if ((pool = pmemobj_open(path, layout)))
+        {
+            size_t size = pmemobj_root_size(pool);
+            uint64_t pool_id;
+            if (size)
+            {
+                PMEMoid root = pmemobj_root(pool, size);
+                pool_id = root.pool_uuid_lo;
+            }
+            else
+            {
+                struct Root
+                {
+                    int size;
+                };
+                PMEMoid root = pmemobj_root(pool, sizeof(Root));
+                pool_id = root.pool_uuid_lo;
+                pmemobj_free(&root);
+            }
+            SendCreatePool(pool_id, (uint64_t)pool);
+            return pool_id;
+        }
+        return 0;
+    }
+    else if (!IsConnected(node_id))
+    {
+        if (ConnectClient(node_id) == false)
+        {
+            Debug::notifyError("OpenRemotePool: Connect Client %d: Failed",
+                               node_id);
+            return 0;
+        }
+    }
+    return SendOpenRemotePool(node_id, path, layout);
+}
+
+void Client::CloseRemotePool(uint16_t node_id, uint64_t pool_id)
+{
+    if (node_id == 0) //local pool
+    {
+        GetRemotePool result;
+        if (SendFindPool(pool_id, &result))
+        {
+            PMEMobjpool* pop = (PMEMobjpool*)(result.virtual_address_);
+            SendDeletePool(pool_id);
+            pmemobj_close(pop);
+            Debug::notifyInfo("Close pool %llu successfullt", pool_id);
+        }
+        Debug::notifyError("Not Find pool %llu", pool_id);
+        return;
+    }
+    else if (!IsConnected(node_id))
+    {
+        if (ConnectClient(node_id) == false)
+        {
+            Debug::notifyError("CloseRemotePool: Connect Client %d: Failed",
+                               node_id);
+        }
+    }
+    SendCloseRemotePool(node_id, pool_id);
 }

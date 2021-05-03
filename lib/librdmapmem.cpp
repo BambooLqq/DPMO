@@ -96,75 +96,21 @@ bool ConnectServer(int argc, char** argv)
     }
 }
 
-PMEMobjpool* rdmapmemobj_open(const char* path, const char* layout)
+uint64_t rdmapmemobj_open(uint16_t node_id, const char* path,
+                          const char* layout)
 {
-    PMEMobjpool* pool = NULL;
-
-    if ((pool = pmemobj_open(path, layout)))
-    {
-        size_t size = pmemobj_root_size(pool);
-        uint64_t pool_id;
-        if (size)
-        {
-            PMEMoid root = pmemobj_root(pool, size);
-            pool_id = root.pool_uuid_lo;
-        }
-        else
-        {
-            struct Root
-            {
-                int size;
-            };
-            PMEMoid root = pmemobj_root(pool, sizeof(Root));
-            pool_id = root.pool_uuid_lo;
-            pmemobj_free(&root);
-        }
-        client->SendCreatePool(pool_id, (uint64_t)pool);
-    }
-    return pool;
+    return client->OpenRemotePool(node_id, path, layout);
 }
 
-PMEMobjpool* rdmapmemobj_create(const char* path, const char* layout,
-                                size_t poolsize, mode_t mode)
+uint64_t rdmapmemobj_create(uint16_t node_id, const char* path,
+                            const char* layout, size_t poolsize, mode_t mode)
 {
-    PMEMobjpool* pool = NULL;
-
-    if ((pool = pmemobj_create(path, layout, poolsize, mode)))
-    {
-        struct Root
-        {
-            int size;
-        };
-        PMEMoid root = pmemobj_root(pool, sizeof(Root));
-        uint64_t pool_id = root.pool_uuid_lo;
-        pmemobj_free(&root);
-        client->SendCreatePool(pool_id, (uint64_t)pool);
-    }
-    return pool;
+    return client->CreateRemotePool(node_id, path, layout, poolsize, mode);
 }
 
-void rdmapmemobj_close(PMEMobjpool* pop)
+void rdmapmemobj_close(uint16_t node_id, uint64_t pool_id)
 {
-    // pmemobj_close(pop);
-    size_t size = pmemobj_root_size(pop);
-    uint64_t pool_id = 0;
-    if (size)
-    {
-        PMEMoid root = pmemobj_root(pop, size);
-        pool_id = root.pool_uuid_lo;
-    }
-    else // size == 0
-    {
-        struct Root
-        {
-            int size;
-        };
-        PMEMoid root = pmemobj_root(pop, sizeof(Root));
-        pool_id = root.pool_uuid_lo;
-        pmemobj_free(&root);
-    }
-    pmemobj_close(pop);
-    client->SendDeletePool(pool_id);
+    client->CloseRemotePool(node_id, pool_id);
 }
 
 void rdmapmem_direct_read(PMEMoid oid, size_t size, void* result)
