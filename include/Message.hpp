@@ -13,6 +13,7 @@ typedef enum
     CREATEREMOTEPOOL,
     CLOSEREMOTEPOOL,
     OPENREMOTEPOOL,
+    REMOTEPOOLROOT,
 } Message;
 
 typedef enum
@@ -75,6 +76,13 @@ struct OpenRemotePool : Request
     char path[128];
     char layout[128];
 };
+
+struct RemotePoolRoot : Request
+{
+    uint64_t pool_id_;
+    uint64_t va_;
+    size_t size_;
+};
 struct Response
 {
     Status op_ret_;
@@ -95,5 +103,10 @@ struct CreateRemotePoolResponse : Response
 struct OpenRemotePoolResponse : Response
 {
     uint64_t pool_id_;
+};
+
+struct RemotePoolRootReponse : Response
+{
+    PMEMoid oid_;
 };
 #endif // !_MESSAGE_H_

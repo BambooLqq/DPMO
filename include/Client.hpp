@@ -106,10 +106,14 @@ class Client
                            uint64_t offset, size_t size, void* source);
 
     uint64_t SendCreateRemotePool(uint16_t node_id, const char* path,
-                              const char* layout, size_t poolsize, mode_t mode);
+                                  const char* layout, size_t poolsize,
+                                  mode_t mode);
 
     uint64_t SendOpenRemotePool(uint16_t node_id, const char* path,
                                 const char* layout);
+
+    PMEMoid SendRemotePoolRoot(uint16_t node_id, uint64_t pool_id, uint64_t va,
+                               size_t size);
 
     bool SendCloseRemotePool(uint16_t nodeid, uint64_t pool_id);
 
@@ -139,6 +143,8 @@ public:
                             const char* layout);
 
     void CloseRemotePool(uint16_t node_id, uint64_t pool_id);
+
+    PMEMoid RemotePoolRoot(uint64_t pool_id, size_t size);
 
     bool SendMessageToServer();
 };

@@ -31,6 +31,8 @@ uint64_t rdmapmemobj_create(uint16_t node_id, const char* path,
 
 void rdmapmemobj_close(uint16_t node_id, uint64_t pool_id);
 
+PMEMoid rdmapmemobj_root(uint64_t pool_id, size_t size);
+
 // read oid ptr's data
 void rdmapmem_direct_read(PMEMoid oid, size_t size, void* result);
 

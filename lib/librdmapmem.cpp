@@ -113,6 +113,11 @@ void rdmapmemobj_close(uint16_t node_id, uint64_t pool_id)
     client->CloseRemotePool(node_id, pool_id);
 }
 
+PMEMoid rdmapmemobj_root(uint64_t pool_id, size_t size)
+{
+    return client->RemotePoolRoot(pool_id, size);
+}
+
 void rdmapmem_direct_read(PMEMoid oid, size_t size, void* result)
 {
     void* ret = nullptr;
