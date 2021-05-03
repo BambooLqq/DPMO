@@ -480,6 +480,7 @@ void Client::ProcessRecv(PeerConnection* peer)
         while (memcmp(recv_data_end, temp, sizeof(temp)))
             ;
         memcpy((void*)(va + offset), recv_data_begin, size); // need to persisit
+        pmem_persist((void*)(va + offset), size); // 
     }
     else if (recv->type_ == CREATEREMOTEPOOL)
     {
