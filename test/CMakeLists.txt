@@ -4,7 +4,7 @@ project(test)
 
 set (CMAKE_C_FLAGS "-Wall -Wno-deprecated-declarations -Wsign-compare")
 
-set (CMAKE_CXX_FLAGS "-g ${CMAKE_C_FLAGS} -Wall -std=c++14 -O0 -DTHREAD  -libverbs -lpmemobj")
+set (CMAKE_CXX_FLAGS "-g ${CMAKE_C_FLAGS} -Wall -std=c++14 -O0 -DTHREAD  -libverbs")
 
 set(INCLUDE_BASE ${PROJECT_SOURCE_DIR}/../include)
 set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/bin")
@@ -24,9 +24,9 @@ add_executable(testwrite
 add_executable(testgetpoolobj
     ${PROJECT_SOURCE_DIR}/testWrite.cpp)
 
-target_link_libraries(testread rdmapmem pmemobj)
-target_link_libraries(testwrite rdmapmem pmemobj)
-target_link_libraries(testgetpoolobj rdmapmem pmemobj)
+target_link_libraries(testread rdmapmem)
+target_link_libraries(testwrite rdmapmem)
+target_link_libraries(testgetpoolobj rdmapmem)
 
 
 

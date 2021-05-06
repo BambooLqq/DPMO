@@ -2,6 +2,7 @@
 #define _MESSAGE_H_
 
 #include "RdmaSocket.hpp"
+#include <libpmemobj.h>
 
 typedef enum
 {

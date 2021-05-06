@@ -21,21 +21,21 @@ int main(int argc, char** argv)
         return 0;
     }
     //创建了一个本地池
-    PMEMobjpool* pop = rdmapmemobj_create(argv[argc - 1], LAYOUT_NAME,
-                                          PMEMOBJ_MIN_POOL, 0666);
+    uint64_t pop = rdmapmemobj_create(2, argv[argc - 1], LAYOUT_NAME,
+                                      PMEMOBJ_MIN_POOL, 0666);
 
-    if (pop == NULL)
+    if (pop == 0)
     {
         perror("pmemobj_create");
         return 1;
     }
-    PMEMoid root = pmemobj_root(pop, sizeof(struct Root));
+    PMEMoid root = rdmapmemobj_root(pop, sizeof(struct Root));
     std::cout << root.off << std::endl;
     Root rootp;
     std::cin >> rootp.str;
     rootp.len = strlen(rootp.str);
     rdmapmem_direct_write(root, sizeof(Root), &rootp);
-    rdmapmemobj_close(pop);
+    rdmapmemobj_close(2, pop);
     DisConnectServer();
     return 0;
 }

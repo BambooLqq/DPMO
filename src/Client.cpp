@@ -495,7 +495,8 @@ void Client::ProcessRecv(PeerConnection* peer)
 
         PMEMobjpool* pool = NULL;
         CreateRemotePoolResponse response;
-        if (pool = pmemobj_create(path, layout, poolsize, create_pool.mode))
+        if ((pool = pmemobj_create(path, layout, poolsize, create_pool.mode))
+            != NULL)
         {
             struct Root
             {
@@ -543,7 +544,7 @@ void Client::ProcessRecv(PeerConnection* peer)
         PMEMobjpool* pop = NULL;
         OpenRemotePoolResponse response;
 
-        if (pop = pmemobj_open(path, layout))
+        if ((pop = pmemobj_open(path, layout)) != NULL)
         {
             size_t size = pmemobj_root_size(pop);
             uint64_t pool_id;
@@ -640,7 +641,6 @@ void Client::ProcessRecv(PeerConnection* peer)
             "Client %d request a pool root, pool_id: %llx, size: %llu",
             peer->node_id, pool_id, size);
 
-        GetRemotePool result;
         PMEMobjpool* pop = (PMEMobjpool*)va;
         RemotePoolRootReponse response;
         response.op_ret_ = SUCCESS;
@@ -1148,6 +1148,9 @@ PMEMoid Client::SendRemotePoolRoot(uint16_t node_id, uint64_t pool_id,
 PMEMoid Client::RemotePoolRoot(uint64_t pool_id, size_t size)
 {
     GetRemotePool result;
+    PMEMoid ret;
+    memset(&ret, 0, sizeof(PMEMoid));
+
     if (SendFindPool(pool_id, &result))
     {
         PMEMobjpool* pop = (PMEMobjpool*)(result.virtual_address_);
@@ -1165,6 +1168,6 @@ PMEMoid Client::RemotePoolRoot(uint64_t pool_id, size_t size)
     else
     {
         Debug::notifyError("Not Find pool %llx ", pool_id);
-        return;
+        return ret;
     }
 }

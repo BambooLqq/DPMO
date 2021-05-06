@@ -11,7 +11,9 @@ set(INCLUDE_BASE ${PROJECT_SOURCE_DIR}/include)
 set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/bin")
 set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/lib")
 
+set (LINK_DIR "/usr/local/lib/pmdk_debug/")
 include_directories(${INCLUDE_BASE})
+link_directories(${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)
 
 SET(DPMO_SRC
         ${PROJECT_SOURCE_DIR}/src/Debug.cpp
@@ -20,7 +22,7 @@ SET(DPMO_SRC
 )
 
 add_library(DPMO SHARED ${DPMO_SRC})
-target_link_libraries(DPMO ibverbs pthread)
+target_link_libraries(DPMO ibverbs pthread ${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)
 
 add_executable(test ${PROJECT_SOURCE_DIR}/testConfiguration.cpp)
 add_executable(server 
@@ -35,10 +37,10 @@ add_executable(client
 add_executable(testRdmaSocket 
         ${PROJECT_SOURCE_DIR}/testRdmaSocket.cpp
 )
-target_link_libraries(testRdmaSocket DPMO)
+target_link_libraries(testRdmaSocket DPMO ${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)
 target_link_libraries(test DPMO)
 target_link_libraries(server DPMO)
-target_link_libraries(client DPMO -libpmemobj)
+target_link_libraries(client DPMO ${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)
 
 
 
@@ -48,4 +50,4 @@ SET(RDMAPMEM_SRC
         ${PROJECT_SOURCE_DIR}/lib/librdmapmem.cpp
 )
 add_library(rdmapmem SHARED ${RDMAPMEM_SRC})
-target_link_libraries(rdmapmem ibverbs pthread pmemobj)
+target_link_libraries(rdmapmem ibverbs pthread ${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)

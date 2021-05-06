@@ -20,20 +20,20 @@ int main(int argc, char** argv)
         std::cout << "test1 connected server failed" << std::endl;
         return 0;
     }
-    PMEMobjpool* pop = rdmapmemobj_open(argv[argc - 1], LAYOUT_NAME);
+    uint64_t pop = rdmapmemobj_open(2, argv[argc - 1], LAYOUT_NAME);
 
-    if (pop == NULL)
+    if (pop == 0)
     {
         perror("pmemobj_open");
         return 1;
     }
 
-    PMEMoid root = pmemobj_root(pop, sizeof(struct Root));
+    PMEMoid root = rdmapmemobj_root(pop, sizeof(struct Root));
     struct Root rootp;
     rdmapmem_direct_read(root, sizeof(Root), &rootp);
     std::cout << rootp.len << std::endl;
     std::cout << rootp.str << std::endl;
-    rdmapmemobj_close(pop);
+    rdmapmemobj_close(2, pop);
     DisConnectServer();
     return 0;
 }
