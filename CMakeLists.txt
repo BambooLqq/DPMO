@@ -34,6 +34,11 @@ add_executable(client
         ${PROJECT_SOURCE_DIR}/src/Client.cpp
 )
 
+add_executable(client2 
+        ${PROJECT_SOURCE_DIR}/RunClient2.cpp
+        ${PROJECT_SOURCE_DIR}/src/Client.cpp
+)
+
 add_executable(testRdmaSocket 
         ${PROJECT_SOURCE_DIR}/testRdmaSocket.cpp
 )
@@ -41,6 +46,8 @@ target_link_libraries(testRdmaSocket DPMO ${LINK_DIR}/libpmemobj.so ${LINK_DIR}/
 target_link_libraries(test DPMO)
 target_link_libraries(server DPMO)
 target_link_libraries(client DPMO ${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)
+target_link_libraries(client2 DPMO ${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)
+
 
 
 

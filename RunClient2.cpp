@@ -108,13 +108,13 @@ int main(int argc, char** argv)
     signal(SIGINT, Stop);
     client = new Client(config.sock_port_, config.config_file_, config.ib_dev_,
                         config.ib_port_);
-    client->SendMessageToServer();
-    client->SendCreatePool(1234, 0x5678abcd);
-    client->SendCreatePool(1234, 0x5678abcd);
-    client->SendDeletePool(1245);
-    // client->SendDeletePool(1234);
-    // client->SendCreatePool(1234, 0xabcdef12);
-    GetRemotePool result;
+    // client->SendMessageToServer();
+    // client->SendCreatePool(1234, 0x5678abcd);
+    // client->SendCreatePool(1234, 0x5678abcd);
+    // client->SendDeletePool(1245);
+    // // client->SendDeletePool(1234);
+    // // client->SendCreatePool(1234, 0xabcdef12);
+    // GetRemotePool result;
     // if (client->SendFindPool(1234, &result))
     // {
     //     std::cout << "result: ip is : " << result.ip_ << std::endl;
@@ -139,26 +139,26 @@ int main(int argc, char** argv)
     //     std::cout << "Not Found Poolid " << 2345 << std::endl;
     // }
 
-    void* res = malloc(1024);
-    if (res == NULL)
-    {
-        std::cout << "result malloc failed" << std::endl;
-    }
-    else
-    {
-        memset(res, 0, 1024);
-        printf("res: %p", res);
-    }
+    // void* res = malloc(1024);
+    // if (res == NULL)
+    // {
+    //     std::cout << "result malloc failed" << std::endl;
+    // }
+    // else
+    // {
+    //     memset(res, 0, 1024);
+    //     printf("res: %p", res);
+    // }
 
-    client->GetRemotePoolData(1234, 3, 13, res);
-    printf("res: %s\n", (char *)res);
-    fflush(stdout);
-    char s[128] = "I am client 2 hhhh";
-    memcpy(res, s, strlen(s) + 1);
-    std::cout << "s :" << (char *)res << std::endl;
+    // client->GetRemotePoolData(1234, 3, 13, res);
+    // printf("res: %s\n", (char *)res);
+    // fflush(stdout);
+    // char s[128] = "I am client 2 hhhh";
+    // memcpy(res, s, strlen(s) + 1);
+    // std::cout << "s :" << (char *)res << std::endl;
 
-    client->WriteRemotePoolData(1234, 16, strlen(s) + 1, res);
-    fflush(stdout);
+    // client->WriteRemotePoolData(1234, 16, strlen(s) + 1, res);
+    // fflush(stdout);
     while (1)
     {
     }

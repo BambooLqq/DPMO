@@ -505,8 +505,8 @@ void Client::ProcessRecv(PeerConnection* peer)
             PMEMoid root = pmemobj_root(pool, sizeof(Root));
             uint64_t pool_id = root.pool_uuid_lo;
             pmemobj_free(&root);
-            Debug::notifyInfo("Create a pool Successfully, poolid is %llx",
-                              pool_id);
+            Debug::notifyInfo("Create a pool Successfully, poolid is %llx, va is %p",
+                              pool_id, pool);
             SendCreatePool(pool_id, (uint64_t)pool);
             response.op_ret_ = SUCCESS;
             response.pool_id_ = pool_id;
@@ -645,10 +645,12 @@ void Client::ProcessRecv(PeerConnection* peer)
         RemotePoolRootReponse response;
         response.op_ret_ = SUCCESS;
         response.oid_ = pmemobj_root(pop, size);
+        Debug::notifyInfo("Root Obj's PoolID is %llx, offset is %llx",
+                          response.oid_.pool_uuid_lo, response.oid_.off);
         uint64_t send_base = peer->my_buf_addr_;
-        memcpy((void*)send_base, &response, sizeof(Response));
+        memcpy((void *)send_base, &response, sizeof(RemotePoolRootReponse));
         rdmasocket_->RdmaSend(peer->qp[0], (uint64_t)send_base,
-                              sizeof(Response));
+                              sizeof(RemotePoolRootReponse));
         ibv_wc wc[1];
         if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
         {
