@@ -103,7 +103,7 @@ typedef struct GetRemotePool
     uint64_t virtual_address_;
 } GetRemotePool;
 
-typedef std::unordered_map<uint32_t, PoolInfo*> ID2POOL;
-typedef std::pair<uint32_t, PoolInfo*> PoolPair;
+typedef std::unordered_map<uint64_t, PoolInfo*> ID2POOL;
+typedef std::pair<uint64_t, PoolInfo*> PoolPair;
 
 #endif // !_GLOBAL_H

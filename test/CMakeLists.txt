@@ -22,7 +22,7 @@ add_executable(testwrite
     ${PROJECT_SOURCE_DIR}/testWrite.cpp)
 
 add_executable(testgetpoolobj
-    ${PROJECT_SOURCE_DIR}/testWrite.cpp)
+    ${PROJECT_SOURCE_DIR}/testGetPoolObj.cpp)
 
 target_link_libraries(testread rdmapmem)
 target_link_libraries(testwrite rdmapmem)

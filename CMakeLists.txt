@@ -11,7 +11,7 @@ set(INCLUDE_BASE ${PROJECT_SOURCE_DIR}/include)
 set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/bin")
 set(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/lib")
 
-set (LINK_DIR "/usr/local/lib/pmdk_debug/")
+set (LINK_DIR "/usr/local/lib/")
 include_directories(${INCLUDE_BASE})
 link_directories(${LINK_DIR}/libpmemobj.so ${LINK_DIR}/libpmem.so)
 
