@@ -66,7 +66,7 @@ Client::~Client()
     {
         // itr->second->detach();
         pthread_t tid = itr->second->native_handle();
-        std::cout << "poll_thread_id is: " << tid << std::endl;
+        // std::cout << "poll_thread_id is: " << tid << std::endl;
         pthread_kill(tid, SIGTERM);
         itr->second->join();
         delete itr->second;
@@ -226,7 +226,7 @@ void Client::Accept(int sock)
             {
                 pthread_t tid
                     = poll_request_thread_[peer->node_id]->native_handle();
-                std::cout << "poll_thread_id is: " << tid << std::endl;
+                // std::cout << "poll_thread_id is: " << tid << std::endl;
                 pthread_kill(tid, SIGTERM);
                 poll_request_thread_[peer->node_id]->join();
                 delete poll_request_thread_[peer->node_id];
@@ -379,8 +379,8 @@ bool Client::SendFindPool(uint64_t pool_id, GetRemotePool* result)
 
 void Client::SignalTerm(int sig)
 {
-    std::cout << "Client::ProcessRequest thread id is "
-              << std::this_thread::get_id() << std::endl;
+    // std::cout << "Client::ProcessRequest thread id is "
+    //   << std::this_thread::get_id() << std::endl;
     pthread_exit(NULL);
 }
 
@@ -452,8 +452,8 @@ void Client::ProcessRecv(PeerConnection* peer)
                get_pool_data.size_);
         void* send_data_end = (void*)((uint64_t)send + get_pool_data.size_);
         memcpy(send_data_end, temp, sizeof(temp));
-        std::cout << "RemoteWrite: " << (char*)send_base << " " << (char*)send
-                  << " " << (char*)send_data_end << std::endl;
+        // std::cout << "RemoteWrite: " << (char*)send_base << " " << (char*)send
+        //           << " " << (char*)send_data_end << std::endl;
         rdmasocket_->RemoteWrite(peer, (uint64_t)send_base, 0,
                                  2 * sizeof(temp) + get_pool_data.size_);
     }
@@ -479,8 +479,9 @@ void Client::ProcessRecv(PeerConnection* peer)
             ;
         while (memcmp(recv_data_end, temp, sizeof(temp)))
             ;
-        memcpy((void*)(va + offset), recv_data_begin, size); // need to persisit
-        pmem_persist((void*)(va + offset), size);            //
+        memcpy((void*)(va + offset), recv_data_begin,
+               size);                             // need to persisit
+        pmem_persist((void*)(va + offset), size); //
     }
     else if (recv->type_ == CREATEREMOTEPOOL)
     {
@@ -768,9 +769,9 @@ bool Client::SendWritePoolData(uint16_t node_id, uint64_t virtual_address,
         memcpy(send_base, temp, sizeof(temp));
         memcpy(send_data, source, size);
         memcpy(send_data_end, temp, sizeof(temp));
-        std::cout << "Remote Write to node : " << node_id << ": "
-                  << (char*)send_base << " " << send_data << ": "
-                  << (char*)send_data_end << std::endl;
+        // std::cout << "Remote Write to node : " << node_id << ": "
+        //           << (char*)send_base << " " << send_data << ": "
+        //           << (char*)send_data_end << std::endl;
         rdmasocket_->RemoteWrite(peer, (uint64_t)send_base,
                                  sizeof(WritePoolData),
                                  sizeof(temp) * 2 + size);
@@ -834,7 +835,7 @@ bool Client::SendMessageToServer()
                           sizeof(buf));
     if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
     {
-        std::cout << "Send Success" << std::endl;
+        // std::cout << "Send Success" << std::endl;
     }
     return true;
 }
@@ -1156,7 +1157,7 @@ PMEMoid Client::RemotePoolRoot(uint64_t pool_id, size_t size)
     if (SendFindPool(pool_id, &result))
     {
         PMEMobjpool* pop = (PMEMobjpool*)(result.virtual_address_);
-        Debug::notifyInfo("Close pool %llx  successfullt", pool_id);
+        // Debug::notifyInfo("Close pool %llx  successfullt", pool_id);
         if (result.node_id_ == my_node_id_) // local pool
         {
             return pmemobj_root(pop, size);

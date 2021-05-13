@@ -1,5 +1,6 @@
 #include "Server.hpp"
 
+#define printf(...)
 Server::Server(int sock_port, std::string config_file_path,
                std::string device_name, uint32_t rdma_port)
 {
@@ -60,7 +61,7 @@ Server::~Server()
     for (auto itr = poll_request.begin(); itr != poll_request.end(); itr++)
     {
         pthread_t tid = itr->second->native_handle();
-        std::cout << "poll_thread_id is: " << tid << std::endl;
+        // std::cout << "poll_thread_id is: " << tid << std::endl;
         pthread_kill(tid, SIGTERM);
         itr->second->join();
         delete itr->second;
@@ -183,7 +184,7 @@ void Server::Accecpt(int sock)
             if (poll_request[peer->node_id])
             {
                 pthread_t tid = poll_request[peer->node_id]->native_handle();
-                std::cout << "poll_thread_id is: " << tid << std::endl;
+                // std::cout << "poll_thread_id is: " << tid << std::endl;
                 pthread_kill(tid, SIGTERM);
                 poll_request[peer->node_id]->join();
                 delete poll_request[peer->node_id];
@@ -216,8 +217,8 @@ PeerConnection* Server::GetPeerConnection(uint16_t nodeid)
 
 void Server::SignalTerm(int sig)
 {
-    std::cout << "Server::ProcessRequest thread id is "
-              << std::this_thread::get_id() << std::endl;
+    // std::cout << "Server::ProcessRequest thread id is "
+    //   << std::this_thread::get_id() << std::endl;
     pthread_exit(NULL);
 }
 

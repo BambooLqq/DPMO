@@ -53,17 +53,17 @@ void Debug::debugCur(const char* format, ...)
                     POTENTIALPROBLEM: the length of format can not exceed
    MAX_FORMAT_LEN - 1, but there is no check.
    @param   ...     Other argument variables to print. Same as printf(). */
-void Debug::notifyInfo(const char* format, ...)
-{
-    char newFormat[MAX_FORMAT_LEN];
+// void Debug::notifyInfo(const char* format, ...)
+// {
+//     char newFormat[MAX_FORMAT_LEN];
 
-    va_list args;
-    va_start(args, format); /* Start of variable arguments. */
-    sprintf(newFormat, "\033[4m%s\033[0m\n",
-            format);          /* Wrap format in a style. */
-    vprintf(newFormat, args); /* Print string of notify information. */
-    va_end(args);             /* End of variable arguments. */
-}
+//     va_list args;
+//     va_start(args, format); /* Start of variable arguments. */
+//     sprintf(newFormat, "\033[4m%s\033[0m\n",
+//             format);          /* Wrap format in a style. */
+//     vprintf(newFormat, args); /* Print string of notify information. */
+//     va_end(args);             /* End of variable arguments. */
+// }
 
 /* Print error information at start period. Can be used in a formatted style
    like a printf().
