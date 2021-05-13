@@ -858,8 +858,8 @@ uint64_t Client::SendCreateRemotePool(uint16_t node_id, const char* path,
     if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
     {
         void* recv_base = (void*)((uint64_t)send_base + FOURMB);
-        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
-        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        rdmasocket_->RdmaRecv(peer->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
         {
             Response* response = (Response*)recv_base;
             if (response->op_ret_ == SUCCESS)
@@ -909,8 +909,8 @@ uint64_t Client::SendOpenRemotePool(uint16_t node_id, const char* path,
     if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
     {
         void* recv_base = (void*)((uint64_t)send_base + FOURMB);
-        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
-        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        rdmasocket_->RdmaRecv(peer->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
         {
             Response* response = (Response*)recv_base;
             if (response->op_ret_ == SUCCESS)
@@ -958,8 +958,8 @@ bool Client::SendCloseRemotePool(uint16_t node_id, uint64_t pool_id)
     if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
     {
         void* recv_base = (void*)((uint64_t)send_base + FOURMB);
-        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
-        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        rdmasocket_->RdmaRecv(peer->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
         {
             Response* response = (Response*)recv_base;
             if (response->op_ret_ == SUCCESS)
@@ -1112,8 +1112,8 @@ PMEMoid Client::SendRemotePoolRoot(uint16_t node_id, uint64_t pool_id,
     if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
     {
         void* recv_base = (void*)((uint64_t)send_base + FOURMB);
-        rdmasocket_->RdmaRecv(peers[0]->qp[0], (uint64_t)recv_base, FOURMB);
-        if (rdmasocket_->PollCompletion(peers[0]->cq, 1, wc))
+        rdmasocket_->RdmaRecv(peer->qp[0], (uint64_t)recv_base, FOURMB);
+        if (rdmasocket_->PollCompletion(peer->cq, 1, wc))
         {
             Response* response = (Response*)recv_base;
             if (response->op_ret_ == SUCCESS)

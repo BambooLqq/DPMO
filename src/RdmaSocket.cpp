@@ -382,6 +382,8 @@ int RdmaSocket::SocketConnect(uint16_t node_id)
     std::cout << "server_ip is " << server_ip << std::endl;
 
     inet_aton(server_ip.c_str(), (struct in_addr*)&remote_address.sin_addr);
+    std::cout << "connect port: " << sock_port_ << std::endl;
+
     remote_address.sin_port = htons(sock_port_);
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -454,6 +456,7 @@ int RdmaSocket::RdmaListen()
     {
         sock_port_ += 1;
     }
+    std::cout << "listen port: " << sock_port_ << std::endl;
     my_address.sin_port = htons(sock_port_);
 
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)
